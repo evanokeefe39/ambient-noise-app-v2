@@ -313,7 +313,11 @@ export default function Var2ImprovedPage() {
               onClick={() => toggleStereo(!stereo)}
               aria-label="Toggle stereo mode"
               aria-pressed={stereo}
-              className="text-[10px] uppercase tracking-widest text-foreground-muted transition-colors hover:text-foreground md:text-[11px]"
+              className={`border px-1.5 py-0.5 text-[10px] uppercase tracking-widest transition-colors md:text-[11px] ${
+                stereo
+                  ? 'border-border bg-surface text-foreground'
+                  : 'border-border text-foreground-muted hover:border-foreground/40 hover:text-foreground'
+              }`}
             >
               {stereo ? 'STEREO' : 'MONO'}
             </button>
