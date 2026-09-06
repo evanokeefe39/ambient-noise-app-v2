@@ -215,7 +215,7 @@ footer .src{font-family:var(--mono);font-size:12px}
     <figure class="shot"><div class="imgframe"><img src="screens/v1-var5.webp" alt="Variant 5 — Nocturne"></div><div class="cap"><b>5 Nocturne</b>subtle 3D / sculpted surface</div></figure>
     <figure class="shot"><div class="imgframe"><img src="screens/v1-var2-improved.webp" alt="2-improved — the winner, Terminal UNIT-02"></div><div class="cap"><b>2-improved</b>Terminal &mdash; improved &middot; the pick</div></figure>
   </div>
-  <figcaption>Six pages under <code>/var</code>: the same minimal dark player &mdash; big play/pause, volume, eight vertical band-EQ sliders &mdash; cast into five distinct design families, then the Terminal concept refined across three rounds into the winner. Screens captured live from the v1 dev server.</figcaption>
+  <figcaption>Six pages under <code>/var</code> in the v1 dev source: the redesign cast the player into five distinct design families, then refined the Terminal concept across three rounds into the winner. (The <code>/var</code> routes were never deployed &mdash; the live ambz.vercel.app served the pre-redesign player above.) Screens captured live from the v1 dev server.</figcaption>
 </figure>
 
 <main class="wrap">
@@ -232,8 +232,14 @@ footer .src{font-family:var(--mono);font-size:12px}
 <!-- ============ 2 SCENE ============ -->
 <section id="scene" class="reveal">
   <h2>The scene<span class="lvl brief">what shipped before</span></h2>
-  <p class="lede">A real audio engine, wearing a wandering face.</p>
-  <p>ambient-noise began in Feb 2026 as a PM-doc-first project (<code>requirements and docs</code>, <code>product mgtm docs completed enough for mvp</code>, <code>phase 0 + 1 generated</code>). It grew a genuine Web Audio engine &mdash; white/pink/brown noise, an 8-band EQ, cut filters &mdash; first toward a mobile (Expo/React Native) app, then toward the web. The engine was real; the interface was a moving target.</p>
+  <p class="lede">A real audio engine, wearing a generic &mdash; and drifting &mdash; face.</p>
+  <p>ambient-noise began in Feb 2026 as a PM-doc-first project (<code>requirements and docs</code>, <code>product mgtm docs completed enough for mvp</code>, <code>phase 0 + 1 generated</code>). It grew a genuine Web Audio engine &mdash; white/pink/brown noise, a configurable EQ, cut filters &mdash; first toward a mobile (Expo/React Native) app, then toward the web. The engine was real; the interface was a moving target.</p>
+
+  <figure class="shot-grid reveal">
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-original-desktop.webp" alt="The original ambient-noise v1, desktop"></div><div class="cap"><b>the original, desktop</b>live at ambz.vercel.app &mdash; the pre-redesign player</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-original-mobile.webp" alt="The original ambient-noise v1, mobile"></div><div class="cap"><b>the original, mobile</b>mood cards, rounded Inter UI, band-EQ detail panel</div></figure>
+  </figure>
+  <p>This is the player that shipped before the redesign &mdash; captured live from <strong>ambz.vercel.app</strong>. It is a full-featured tape-deck product (the richer, mobile-rooted v1) and, visually, a competent but generic &ldquo;minimal dark wellness&rdquo; surface: <strong>Inter</strong> (not a mono instrument face), <strong>rounded 14px buttons</strong>, mood cards (Sleep / Focus / Block Noise / Meditate), and an EQ edited band-by-band through a focused detail panel (BAND 1 &middot; 31&nbsp;Hz &middot; PK/LS/HS/LP/HP/NT types). The redesign would not merely polish this &mdash; it would replace its whole design language with the far more coherent UNIT-02 instrument, then keep the stronger interaction ideas (presets, filter cuts, an EQ you read at a glance).</p>
   <p>Look at the commit subjects between the first player and the redesign and the pattern is unmistakable &mdash; a <em>tape deck</em> whose look was nudged, not decided:</p>
   <div class="callout reveal">
     <span class="tag">the drift, verbatim</span>
