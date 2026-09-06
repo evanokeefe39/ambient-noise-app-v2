@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From &ldquo;ui bumps&rdquo; to UNIT-02 — the design agent that finished a player</title>
+<meta name="description" content="A postmortem of the ambient-noise v1 &rarr; v2 redesign: how a design/UI-UX agent cast a generic dark player into five distinct design families, picked a winner, refined it into a coherent instrument, and shipped it web-only — and the scraper-fed taste corpus the agent runs on.">
+<!-- Design system: dev-portfolio-2 /landing (skin F — cool type-led terminal).
+     Token source: components/landing/tokens.css. Body/data faces are the portfolio's
+     own Google fonts (IBM Plex Sans/Mono); the portfolio's local DOS faces
+     (ModernDOS/PixelOperator) are substituted with the Google-hosted terminal
+     face VT323 for display, since this file ships standalone. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* dev-portfolio-2 token layer (skin F defaults) */
+  --ld-bg:#f6f8fa;
+  --ld-ink:#1c2733;
+  --ld-ink-soft:#45525e;
+  --ld-ink-faint:#8a97a3;
+  --ld-accent:#0e7490;         /* AFTER — coherent, crafted, shipped (portfolio accent) */
+  --ld-rule:#dde4ea;
+  --ld-card-bg:#eef2f6;
+  --ld-card-border:#d4dce3;
+  --ld-btn-bg:#1c2733;
+  --ld-btn-ink:#22d3ee;
+  --ld-cat-amber:#b45309;      /* BEFORE — generic, manual, drifting (portfolio category amber) */
+  --ld-cat-amber-soft:#f4ece2;
+  --ld-diff-del:#b91c1c;
+  --ld-dark:#1c2733;
+  --ld-dark-ink:#dfe5ea;
+  /* type register: display = terminal face (uppercase), body = IBM Plex Sans, data = IBM Plex Mono */
+  --display:"VT323",var(--mono),monospace;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{font-family:var(--body);background:var(--ld-bg);color:var(--ld-ink);font-size:16.5px;line-height:1.65;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:no-preference){html.js .reveal:not(.in){opacity:0;transform:translateY(14px)}html.js .reveal{transition:opacity .7s ease,transform .7s ease}html.js .reveal.in{opacity:1;transform:none}}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.prose{max-width:68ch}
+a{color:var(--ld-accent);text-underline-offset:3px}
+code,.mono{font-family:var(--mono);font-size:.82em;background:var(--ld-card-bg);border:1px solid var(--ld-card-border);border-radius:2px;padding:.1em .35em;overflow-wrap:anywhere}
+strong{font-weight:600}
+@media(max-width:720px){table{display:block;overflow-x:auto;font-size:13px}nav.toc a{padding:12px 10px}}
+
+/* masthead — typed command line register */
+.masthead{border-bottom:1px solid var(--ld-rule);padding:16px 0;background:var(--ld-bg);position:relative;z-index:5}
+.masthead .wrap{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ld-ink-faint)}
+.kicker a{color:inherit;text-decoration:none}
+.kicker a:hover{color:var(--ld-accent)}
+
+/* sticky nav */
+nav.toc{position:sticky;top:0;z-index:40;background:rgba(246,248,250,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--ld-rule)}
+nav.toc .wrap{display:flex;gap:4px;overflow-x:auto;padding:0 24px;scrollbar-width:none}
+nav.toc .wrap::-webkit-scrollbar{display:none}
+nav.toc a{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--ld-ink-faint);text-decoration:none;padding:12px 12px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s,border-color .2s}
+nav.toc a:hover{color:var(--ld-ink)}
+nav.toc a.active{color:var(--ld-ink);border-bottom-color:var(--ld-accent)}
+
+/* reading-level tag */
+.lvl{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--ld-card-border);border-radius:0;padding:3px 10px;color:var(--ld-ink-faint);vertical-align:middle;margin-left:10px;font-weight:500;background:var(--ld-card-bg)}
+.lvl.deep{background:var(--ld-dark);color:#22d3ee;border-color:#3a4550}
+.lvl.brief{background:var(--ld-card-bg);color:var(--ld-accent);border-color:var(--ld-accent)}
+
+/* hero */
+header.hero{padding:56px 0 30px}
+.hero h1{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:clamp(2.3rem,5.4vw,4.1rem);line-height:1.04;letter-spacing:.01em;max-width:22ch}
+.hero h1 .after{color:var(--ld-accent)}
+.hero h1 .before{color:var(--ld-cat-amber)}
+.hero .dek{font-family:var(--body);font-size:clamp(1.05rem,1.8vw,1.2rem);line-height:1.6;color:var(--ld-ink-soft);max-width:64ch;margin-top:20px}
+.byline{margin-top:24px;font-family:var(--mono);font-size:12px;letter-spacing:.03em;color:var(--ld-ink-faint);display:flex;gap:18px;flex-wrap:wrap}
+.legend{display:flex;gap:26px;flex-wrap:wrap;margin-top:26px;font-family:var(--mono);font-size:12.5px;color:var(--ld-ink-soft)}
+.legend .key{display:inline-flex;align-items:center;gap:8px}
+.legend .chip{width:26px;height:12px;border-radius:0;display:inline-block}
+.chip.a{background:color-mix(in srgb,var(--ld-accent) 14%,transparent);border:1.5px solid var(--ld-accent)}
+.chip.b{background:var(--ld-cat-amber-soft);border:1.5px dashed var(--ld-cat-amber)}
+
+figure{margin:2.2em 0}
+figure svg{width:100%;height:auto;display:block}
+figcaption{font-size:13px;color:var(--ld-ink-faint);margin-top:10px;max-width:82ch;line-height:1.6}
+.diag-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ld-ink-faint);margin-bottom:14px}
+.diag-title::before{content:"> ";color:var(--ld-accent)}
+
+/* screenshot figure grid */
+figure.shot{margin:1.6em 0}
+figure.shot .imgframe{background:#1c2733;border:1px solid var(--ld-card-border);padding:8px;border-radius:2px}
+figure.shot img{display:block;width:100%;height:auto;border-radius:1px}
+figure.shot.single{max-width:860px}
+figure.shot figcaption{font-size:12.5px}
+.shot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:900px){.shot-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.shot-grid{grid-template-columns:1fr}}
+.shot-grid figure{margin:0}
+.shot-grid .cap{font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--ld-ink-faint);margin-top:8px;line-height:1.5}
+.shot-grid .cap b{color:var(--ld-ink-soft);font-weight:600;display:block;font-size:12px;text-transform:uppercase}
+.shot-grid figure.shot .imgframe{background:#fff;border:1px solid var(--ld-card-border);padding:6px}
+
+/* sections */
+section{padding:48px 0 6px;scroll-margin-top:56px}
+section > .diag-title{margin-top:0}
+h2{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:clamp(1.9rem,3.4vw,2.7rem);line-height:1.1;letter-spacing:.01em;margin-bottom:16px;max-width:28ch}
+h3{font-family:var(--body);font-weight:600;font-size:1.05rem;margin:1.6em 0 .6em}
+.lede{font-family:var(--body);font-weight:500;font-size:1.15rem;line-height:1.6;color:var(--ld-ink-soft);max-width:60ch;margin-bottom:1.4em}
+section p{margin:0 0 1.3em;max-width:72ch}
+section ul,section ol{margin:0 0 1.3em 1.2em;max-width:72ch}
+section li{margin:.35em 0}
+.pull{font-family:var(--body);font-weight:500;font-size:clamp(1.2rem,2.2vw,1.5rem);line-height:1.45;max-width:36ch;margin:2em 0;padding-left:22px;border-left:3px solid var(--ld-accent);color:var(--ld-ink)}
+.pull .where{display:block;font-family:var(--mono);font-weight:400;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ld-ink-faint);margin-top:12px}
+
+/* callout */
+.callout{background:var(--ld-dark);color:var(--ld-dark-ink);border-radius:0;padding:24px 28px;margin:2em 0;max-width:860px;border-left:3px solid #22d3ee}
+.callout .tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#f0a8a8;display:block;margin-bottom:12px}
+.callout h3{margin:0 0 .6em;color:#f6f8fa;font-size:1.1rem}
+.callout p{color:var(--ld-dark-ink);max-width:76ch}
+.callout code,.callout .mono{background:#26313c;border-color:#3a4550;color:#cfe6ee}
+.callout ul{color:var(--ld-dark-ink);margin:0 0 1em 1.2em;max-width:74ch}
+.callout li{margin:.3em 0}
+
+/* table */
+table{border-collapse:collapse;width:100%;max-width:980px;margin:1.4em 0;font-size:14.5px}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ld-ink-faint);text-align:left;padding:10px 14px;border-bottom:2px solid var(--ld-ink)}
+td{padding:11px 14px;border-bottom:1px solid var(--ld-rule);vertical-align:top}
+tr.reject td:last-child{color:var(--ld-cat-amber);font-weight:600}
+tr.adopt td:last-child{color:var(--ld-accent);font-weight:600}
+tr.side td:last-child{color:var(--ld-ink-faint)}
+
+table.cast th,table.cast td{vertical-align:top}
+table.cast td{font-size:14px;line-height:1.5}
+table.cast td .cap{font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--ld-ink-faint);display:block;margin-top:.4em;line-height:1.5}
+.pick{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:.22em .6em;border-radius:0;white-space:nowrap;background:color-mix(in srgb,var(--ld-accent) 12%,transparent);border:1px solid var(--ld-accent);color:var(--ld-accent)}
+.drop{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:.22em .6em;border-radius:0;white-space:nowrap;background:var(--ld-cat-amber-soft);border:1px solid var(--ld-cat-amber);color:var(--ld-cat-amber)}
+
+/* before/after two-column */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:1.6em 0;max-width:980px}
+@media(max-width:720px){.ba{grid-template-columns:1fr}}
+.ba .col{border-radius:0;padding:22px 24px}
+.ba .before{background:var(--ld-cat-amber-soft);border:1.5px dashed var(--ld-cat-amber)}
+.ba .after{background:color-mix(in srgb,var(--ld-accent) 10%,var(--ld-bg));border:1.5px solid var(--ld-accent)}
+.ba h4{font-family:var(--display);text-transform:uppercase;font-weight:400;font-size:1.5rem;margin-bottom:.5em}
+.ba .colk{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:8px}
+.ba.before .colk{color:var(--ld-cat-amber)}
+.ba.after .colk{color:var(--ld-accent)}
+.ba ul{margin-left:1.1em;font-size:15px}
+.ba li{margin:.35em 0}
+.ba strong{color:var(--ld-ink)}
+
+/* takeaways */
+.take{margin:0 0 1.2em}
+.take .n{font-family:var(--mono);font-weight:600;color:var(--ld-accent);font-size:1em}
+.take .n.b{color:var(--ld-cat-amber)}
+/* phase strip */
+.phases{margin:1.8em 0;max-width:980px}
+.phase{display:grid;grid-template-columns:92px 1fr;gap:16px;padding:18px 0;border-bottom:1px solid var(--ld-rule)}
+.phase:last-child{border-bottom:none}
+.phase .when{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ld-ink-faint);padding-top:4px}
+.phase h3{margin:0 0 .4em}
+.phase p{margin:0 0 .6em;max-width:78ch}
+footer{margin-top:64px;border-top:1px solid var(--ld-rule);padding:30px 0 60px;font-size:13px;color:var(--ld-ink-faint)}
+footer p{max-width:90ch;margin-bottom:.6em}
+footer .src{font-family:var(--mono);font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="wrap">
+    <span class="kicker"><a href="#top">ambient-noise-app &rsaquo; postmortem</a></span>
+    <span class="kicker">design-agent makeover &middot; 2026-09-05 &rarr; 09-06</span>
+  </div>
+</div>
+
+<nav class="toc" aria-label="Article sections">
+  <div class="wrap">
+    <a href="#brief">Bottom line</a>
+    <a href="#scene">The scene</a>
+    <a href="#cast">The five casts</a>
+    <a href="#winner">The winner</a>
+    <a href="#ship">Ship as v2</a>
+    <a href="#lineage">Agent lineage</a>
+    <a href="#before">Before / after</a>
+    <a href="#takeaways">Takeaways</a>
+    <a href="#grounding">Grounding</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>From <span class="before">&ldquo;ui bumps&rdquo;</span> to <span class="after">UNIT-02</span>: the design agent that finished a player.</h1>
+    <p class="dek">For five months ambient-noise was a working audio toy whose UI was pushed forward one &ldquo;ui bump&rdquo; at a time &mdash; a tape deck whose look drifted and never settled. In a single day a design/UI-UX agent cast the same player into <strong>five distinct design families</strong>, picked one, refined it into a coherent instrument, and shipped it as a clean web-only v2. This is the postmortem of that day &mdash; and of the scraper-fed taste corpus the agent stands on.</p>
+    <div class="byline">
+      <span>Postmortem &middot; grounded in ambient-noise-app commits 1af4d93 &rarr; d4ddb88 &amp; ambient-noise-app-v2</span>
+      <span>Design-agent value story</span>
+    </div>
+    <div class="legend">
+      <span class="key"><span class="chip b"></span>&nbsp; before &mdash; generic &middot; manual &middot; drifting</span>
+      <span class="key"><span class="chip a"></span>&nbsp; after &mdash; coherent &middot; crafted &middot; shipped</span>
+    </div>
+  </div>
+</header>
+
+<!-- ============ FIGURE: the transformation ============ -->
+<figure class="wrap reveal">
+  <div class="diag-title">Figure 1 &mdash; the whole arc on one screen: five casts &rarr; one refined winner &rarr; shipped v2</div>
+  <div class="shot-grid">
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var1.webp" alt="Variant 1 — Aurora"></div><div class="cap"><b>1 Aurora</b>soft glass / glow wellness</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2.webp" alt="Variant 2 — Terminal"></div><div class="cap"><b>2 Terminal</b>brutalist / minimal mono grid</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var3.webp" alt="Variant 3 — Fader Desk"></div><div class="cap"><b>3 Fader Desk</b>warm analog / physical material</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var4.webp" alt="Variant 4 — Score"></div><div class="cap"><b>4 Score</b>editorial typographic</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var5.webp" alt="Variant 5 — Nocturne"></div><div class="cap"><b>5 Nocturne</b>subtle 3D / sculpted surface</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2-improved.webp" alt="2-improved — the winner, Terminal UNIT-02"></div><div class="cap"><b>2-improved</b>Terminal &mdash; improved &middot; the pick</div></figure>
+  </div>
+  <figcaption>Six pages under <code>/var</code>: the same minimal dark player &mdash; big play/pause, volume, eight vertical band-EQ sliders &mdash; cast into five distinct design families, then the Terminal concept refined across three rounds into the winner. Screens captured live from the v1 dev server.</figcaption>
+</figure>
+
+<main class="wrap">
+
+<!-- ============ 1 BOTTOM LINE ============ -->
+<section id="brief" class="reveal">
+  <h2>Bottom line<span class="lvl brief">60-second brief</span></h2>
+  <div class="take"><span class="n b">1&ensp;</span> For ~5 months ambient-noise was a <strong>working but aesthetically drifting</strong> product: the git log reads &ldquo;ui bump,&rdquo; &ldquo;uiux bump,&rdquo; &ldquo;needs more ui updates,&rdquo; &ldquo;v2 ui&rdquo; &mdash; iterative nudges that never resolved into a settled design language.</div>
+  <div class="take"><span class="n b">2&ensp;</span> The fix was not more nudges. A <strong>design/UI-UX agent</strong> (the frontend-craft / ux-worker lineage) cast the one player into <strong>five distinct design families</strong> in a single day &mdash; Aurora, Terminal, Fader Desk, Score, Nocturne &mdash; then refined the Terminal concept across three rounds into <strong>UNIT-02</strong>.</div>
+  <div class="take"><span class="n a">3&ensp;</span> The winner was <strong>shipped as a clean web-only v2</strong> (flat Next.js PWA), and then kept getting real polish &mdash; independent L/R stereo, a MONO/STEREO toggle, marquee preset names, a versioned service worker for reliable PWA updates. Craft, not just a static mockup.</div>
+  <div class="take"><span class="n a">4&ensp;</span> The agent itself is <strong>not magic</strong> &mdash; it is the endpoint of a long, deliberate pipeline that scraped and curated real Instagram design inspiration into a taste corpus, then formalised that corpus into skills an implementer auto-loads. The ambient-noise makeover is that pipeline&rsquo;s best proof.</div>
+</section>
+
+<!-- ============ 2 SCENE ============ -->
+<section id="scene" class="reveal">
+  <h2>The scene<span class="lvl brief">what shipped before</span></h2>
+  <p class="lede">A real audio engine, wearing a wandering face.</p>
+  <p>ambient-noise began in Feb 2026 as a PM-doc-first project (<code>requirements and docs</code>, <code>product mgtm docs completed enough for mvp</code>, <code>phase 0 + 1 generated</code>). It grew a genuine Web Audio engine &mdash; white/pink/brown noise, an 8-band EQ, cut filters &mdash; first toward a mobile (Expo/React Native) app, then toward the web. The engine was real; the interface was a moving target.</p>
+  <p>Look at the commit subjects between the first player and the redesign and the pattern is unmistakable &mdash; a <em>tape deck</em> whose look was nudged, not decided:</p>
+  <div class="callout reveal">
+    <span class="tag">the drift, verbatim</span>
+    <ul>
+      <li><code>2026-02-21&ensp;ui bumps</code></li>
+      <li><code>2026-02-22&ensp;uiux bump</code></li>
+      <li><code>2026-02-23&ensp;ui bump</code></li>
+      <li><code>2026-02-24&ensp;ui bump</code></li>
+      <li><code>2026-02-24&ensp;bug fix</code> &middot; <code>2026-02-26&ensp;fix: stub audio engine to unblock dev client build</code></li>
+    </ul>
+    <p>Five months of shipping a thing that works, wrapped in a surface that keeps changing by small degrees and never lands. There is no coherent &ldquo;why this looks like this.&rdquo;</p>
+  </div>
+  <p>The deeper point: <strong>the constraint was never engineering.</strong> The audio graph, EQ math, autoplay handling &mdash; all there and working. The gap was <em>taste</em>: a defensible visual direction, chosen from real alternatives, executed with consistency. That is exactly the problem a design/UI-UX agent is built to take off a human&rsquo;s plate.</p>
+</section>
+
+<!-- ============ 3 THE FIVE CASTS ============ -->
+<section id="cast" class="reveal">
+  <h2>The five casts<span class="lvl brief">the redesign day</span></h2>
+  <p class="lede">One player, five design families &mdash; so the choice is real, not a vibe.</p>
+  <p>The agent did not pick a theme and build it. It <strong>cast alternatives</strong>: take the same controls &mdash; big play/pause, volume, eight vertical band sliders &mdash; and render them in five genuinely distinct design languages. The comparison index (<code>/var</code>) frames it plainly:</p>
+  <blockquote class="pull">&ldquo;The same minimal dark player &hellip; cast in five distinct design families. Static + local interaction only; no audio engine, nothing persisted.&rdquo;<span class="where">&mdash; /var comparison index, verbatim</span></blockquote>
+  <figure class="shot single reveal">
+    <div class="imgframe"><img src="screens/v1-five-concepts.webp" alt="The five-concepts comparison index"></div>
+    <figcaption>The comparison landing page that lays out all five concepts side by side &mdash; the &ldquo;taste menu&rdquo; the pick is made against.</figcaption>
+  </figure>
+  <table class="cast">
+    <thead><tr><th>#</th><th>Concept</th><th>Design family</th><th>Signature (verified live)</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>Aurora</strong></td><td>soft glass / glow wellness</td><td>Inter, fully rounded pill controls, 48&nbsp;px title, breathing aura &mdash; wellness-app idiom.</td><td><span class="drop">Cast &middot; not picked</span></td></tr>
+      <tr><td>2</td><td><strong>Terminal</strong></td><td>brutalist / minimal mono grid</td><td>JetBrains Mono, <strong>zero radius</strong>, square controls, hard rules, segmented meter &mdash; the player as an instrument panel.</td><td><span class="pick">Pick &rarr; refined</span></td></tr>
+      <tr><td>3</td><td><strong>Fader Desk</strong></td><td>warm analog / physical material</td><td>Space Mono, rounded-4px, amber backlit nameplate, chunky hardware &mdash; studio-console warmth.</td><td><span class="drop">Cast &middot; not picked</span></td></tr>
+      <tr><td>4</td><td><strong>Score</strong></td><td>editorial typographic</td><td>Inter, 72&nbsp;px lowercase giant headline, hairline rules &mdash; magazine layout.</td><td><span class="drop">Cast &middot; not picked</span></td></tr>
+      <tr><td>5</td><td><strong>Nocturne</strong></td><td>subtle 3D / sculpted surface</td><td>Inter, rounded pills, near-black sculpted fills, raised play puck &mdash; depth via material.</td><td><span class="drop">Cast &middot; not picked</span></td></tr>
+    </tbody>
+  </table>
+  <p>The whole point of a <strong>cast</strong> rather than a single guess: it makes the design decision explicit and reviewable. A human (or the taste stage) looks at five honest, distinct directions and picks &mdash; instead of rubber-stamping whichever theme an agent happened to generate. Four are rejected loudly; one is chosen deliberately.</p>
+</section>
+
+<!-- ============ 4 THE WINNER ============ -->
+<section id="winner" class="reveal">
+  <h2>The winner<span class="lvl brief">Terminal &rarr; UNIT-02</span></h2>
+  <p class="lede">The Terminal concept won &mdash; and then had to earn the win across three rounds of refinement.</p>
+  <p>The Terminal identity &mdash; <em>brutalist / minimal mono grid: hard 1px rules, zero radius, square controls, the player as an instrument panel</em> &mdash; is a coherent, defensible direction with a strong point of view. But picking it was only the start. The commit trail shows the refinement loop that took a concept to a finished instrument:</p>
+  <div class="phases">
+    <div class="phase"><div class="when">cast</div><div><h3><code>0c2ac23</code> add 5 minimal dark player UI redesign variants</h3><p>The five casts land at <code>/var/1&hellip;5</code>.</p></div></div>
+    <div class="phase"><div class="when">refit</div><div><h3><code>a68fd6d</code> refit UI variants to 8-band vertical EQ, viewport-fit</h3><p>Harmonise the winner around the real control surface &mdash; a proper 8-band vertical EQ that fits the viewport.</p></div></div>
+    <div class="phase"><div class="when">improve</div><div><h3><code>bfb050b</code> add improved var2 player with preset nav, dB EQ, cut filters</h3><p>The interactive round: preset navigation, live dB readouts, low/high-cut filters.</p></div></div>
+    <div class="phase"><div class="when">polish</div><div><h3><code>4da94c4</code>&hellip;<code>d4ddb88</code> var2-improved: black faders, fixed chevrons, EQ collapse, noise fills, AA fixes, wired to engine</h3><p>Six polish commits tightening alignment, spacing, contrast and finally wiring the whole surface to the real AudioEngine.</p></div></div>
+  </div>
+  <div class="callout reveal">
+    <span class="tag">the identity, verbatim</span>
+    <p>&ldquo;Variant 2-improved &mdash; &lsquo;Terminal / UNIT 02&rsquo; evolved. Preserves the instrument-panel identity: hard 1px rules, square controls, zero radius, uppercase JetBrains Mono, STANDBY/RUNNING lamp, segmented meter, h-dvh viewport fit, eight vertical faders.&rdquo;</p>
+  </div>
+  <p>Notice what the refinement adds: <strong>state and meaning</strong>, not decoration. A STANDBY/RUNNING lamp. Live dB with a 0&nbsp;dB neutral rule. A proper 63&nbsp;Hz&ndash;8&nbsp;kHz octave band set (the earlier variants still used the legacy 31&nbsp;Hz&ndash;16&nbsp;kHz labels). 70s-retro noise fills (cream/salmon/burnt-orange) for the three colors. This is where a design agent earns its keep &mdash; the pick was taste, but the shipping was craft: every element justified, nothing decorative left floating.</p>
+</section>
+
+<!-- ============ 5 SHIP AS V2 ============ -->
+<section id="ship" class="reveal">
+  <h2>Ship as v2<span class="lvl brief">web-only, flat, installable</span></h2>
+  <p class="lede">From a winning page inside a monorepo to a clean, web-only product in one move.</p>
+  <p>The v1 repo was a pnpm monorepo (Expo mobile + web + shared/UI packages) whose git root sat at the parent directory. The win was a single page buried in it. The spin-out took exactly that surface &mdash; <em>check what a surface actually imports, not what the package exports</em> &mdash; and vendored only what UNIT-02 really used: ~6 type definitions plus an EQ constant. No monorepo, no workspace packages.</p>
+  <figure class="shot single reveal">
+    <div class="imgframe"><img src="screens/v2-desktop.webp" alt="ambient-noise v2 — UNIT-02 player, desktop"></div>
+    <figcaption>ambient-noise v2: the finished UNIT-02 instrument, desktop view &mdash; STANDBY/RUNNING lamp, STEREO toggle, preset navigator, dB EQ, retro noise fills.</figcaption>
+  </figure>
+  <div class="shot-grid">
+    <figure class="shot"><div class="imgframe"><img src="screens/v2-mobile.png" alt="ambient-noise v2 — mobile viewport"></div><div class="cap"><b>v2 mobile</b>a mobile-first PWA, no vertical scroll at target sizes</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2-improved.webp" alt="the v1 winner it shipped from"></div><div class="cap"><b>v2&rsquo;s parent</b>the v1 winner it shipped from</div></figure>
+  </div>
+  <p>And v2 did not stop at the static win &mdash; it kept receiving genuine feature polish, now on a clean base:</p>
+  <table>
+    <thead><tr><th>Commit</th><th>What landed</th></tr></thead>
+    <tbody>
+      <tr class="adopt"><td><code>400275d</code> (v2 init)</td><td>flat web-only UNIT-02 noise instrument (PWA)</td></tr>
+      <tr class="adopt"><td><code>92b000b</code></td><td>independent L/R stereo noise with a MONO/STEREO toggle</td></tr>
+      <tr class="adopt"><td><code>9f81388</code> (PR&nbsp;#1)</td><td>stereo mode, marquee preset names, styled toggle &mdash; the first PR</td></tr>
+      <tr class="adopt"><td><code>e84dfd8</code>&hellip;<code>10c34f7</code></td><td>marquee preset names + reduced-motion interplay across engines</td></tr>
+      <tr class="adopt"><td><code>f271489</code></td><td>versioned service worker for reliable PWA updates</td></tr>
+      <tr class="adopt"><td><code>1c6199d</code></td><td>per-platform &ldquo;add to home screen&rdquo; install guide</td></tr>
+    </tbody>
+  </table>
+  <p>The v2 README states the identity plainly and correctly: <em>&ldquo;a single screen in the UNIT-02 aesthetic: a brutalist mono instrument panel with hard 1px rules, square controls, JetBrains Mono, and a STANDBY/RUNNING lamp.&rdquo;</em> A design language you can state in one sentence is a design language that survived contact with an implementer, three rounds of refinement, a repo spin-out, and a PWA deploy.</p>
+</section>
+
+<!-- ============ 6 AGENT LINEAGE ============ -->
+<section id="lineage" class="reveal">
+  <h2>Under the hood<span class="lvl deep">the agent that did it</span></h2>
+  <p class="lede">The makeover is the proof; this is the pipeline that produced the agent.</p>
+  <p>The redesign of 2026-09-05 is not an isolated feat &mdash; it is the visible output of a deliberately-built design-agent stack, and that stack itself was <em>derived from</em> months of earlier work scraping and analysing Instagram design content. The lineage runs in two parallel threads that finally met.</p>
+
+  <h3>Thread one &mdash; the taste corpus (what makes the agent opinionated)</h3>
+  <p>Before there was a design agent, there was a pipeline for collecting <em>real design inspiration</em>. A chain of repos hardened an Instagram-scraping ingest path: <code>apify-cc-plugin</code> &rarr; <code>cc-apify-plugin-v2</code> &rarr; <code>cc-apify-plugin-v3</code> (a four-gate, DuckDB-backed ingestion plugin that keeps data out of the LLM context), plus <code>scrape-ig-saved-list</code> (HAR-capture parsing of a saved-list export, Gemini extraction into a knowledgebase) and its medallion successor in <code>datalake</code>. Strategy repos &mdash; <code>social-media-strategy</code>, <code>social-media-content-strategy-research</code> &mdash; framed what was worth collecting.</p>
+  <p>That corpus is why ambient-noise&rsquo;s <code>ux-design/</code> folder holds ~90 reference images &mdash; tape-reel UI mockups, VFD displays, Technics hardware, retro-vintage aesthetics. <strong>The design families the agent casts are not invented in a vacuum; they are assembled from a collected, curated visual vocabulary.</strong></p>
+
+  <h3>Thread two &mdash; the agent stack (what executes the taste)</h3>
+  <p>Formalised on the same day as the redesign (2026-09-05): the <code>frontend-craft</code> implementer + the <code>ux-worker</code> orchestrator that briefs it. frontend-craft is a frontend implementer specialised for <em>craft-and-anti-slop</em> quality &mdash; it auto-loads the <code>impeccable</code> audit engine, <code>web-design-guidelines</code>, <code>vercel-react-best-practices</code>, and a taste-skill (<code>design-taste-frontend</code>), and routes heavier engines (<code>ui-ux-pro-max</code>, <code>interface-design</code>, <code>hue</code>, <code>scroll-craft</code>) on demand by concern.</p>
+  <p>The <code>ux-worker/CAPABILITIES.md</code> registry encodes the whole doctrine as a concern taxonomy &mdash; craft floor, taste direction, design intelligence, product-UI continuity, brand&rarr;tokens, motion, mobile-first. Crucially it also records a <strong>classified-and-rejected list</strong>: skills that were researched and deliberately not installed (phantom repos, stale derivative aggregates, license-gated ones). Building the stack was curation, not accumulation.</p>
+  <blockquote class="pull">The redesign loop was the real-world rehearsal of the process the agents were built for: cast &ge;5 aesthetic variants from &ge;3 design families, pick one against a declared spec, implement with a craft-skilled agent, audit it, ship.<span class="where">&mdash; ux-worker / frontend-craft operating doctrine</span></blockquote>
+  <p>So the honest framing of the makeover is not &ldquo;an agent drew a pretty UI.&rdquo; It is: <em>a pipeline scraped the web for taste, that taste was curated into a vocabulary and then into skills, and those skills let a small specialised agent do &mdash; in one day, with visible alternatives and a reviewable pick &mdash; what five months of &ldquo;ui bumps&rdquo; could not.</em></p>
+</section>
+
+<!-- ============ 7 BEFORE / AFTER ============ -->
+<section id="before" class="reveal">
+  <h2>Before / after<span class="lvl brief">what actually changed</span></h2>
+  <p class="lede">Not prettier &mdash; decided, and shippable.</p>
+  <div class="ba before after">
+    <div class="col before"><h4>Before</h4><span class="colk">the drifting tape deck</span>
+      <ul>
+        <li>Working audio, <strong>wandering surface</strong>: &ldquo;ui bump,&rdquo; &ldquo;uiux bump,&rdquo; &ldquo;needs more ui updates.&rdquo;</li>
+        <li><strong>No defensible direction</strong> &mdash; a look that changed by small degrees without ever landing.</li>
+        <li>Legacy 31&nbsp;Hz&ndash;16&nbsp;kHz EQ labels that didn&rsquo;t match the UI&rsquo;s own band names.</li>
+        <li>No stated identity you could hold an implementer to.</li>
+      </ul>
+    </div>
+    <div class="col after"><h4>After</h4><span class="colk">UNIT-02, shipped as v2</span>
+      <ul>
+        <li><strong>One explicit identity</strong>: brutalist mono instrument panel, hard rules, square controls, JetBrains Mono, STANDBY/RUNNING lamp.</li>
+        <li><strong>Five real alternatives existed</strong>, so the pick is reviewable &mdash; not a vibe.</li>
+        <li>Correct 63&nbsp;Hz&ndash;8&nbsp;kHz octave bands, live dB with a neutral rule.</li>
+        <li>Shipped clean as a flat, web-only, installable PWA &mdash; and kept receiving real polish.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8 TAKEAWAYS ============ -->
+<section id="takeaways" class="reveal">
+  <h2>Takeaways<span class="lvl brief">the reusable lesson</span></h2>
+  <div class="take"><span class="n a">1&ensp;</span> <strong>A design problem needs a design method, not more effort.</strong> Five months of &ldquo;ui bumps&rdquo; never produced a settled look; one deliberate cast-and-pick day did. The constraint was method (show real alternatives, pick, refine), not hours.</div>
+  <div class="take"><span class="n a">2&ensp;</span> <strong>Cast, don&rsquo;t guess.</strong> The single highest-leverage move was producing five distinct, honest design families before committing. It turns &ldquo;is this good?&rdquo; into &ldquo;which of these, and why not the others?&rdquo;</div>
+  <div class="take"><span class="n a">3&ensp;</span> <strong>Taste can be built, not wished for.</strong> The agent&rsquo;s point of view came from a scraped-and-curated design corpus plus curated skills &mdash; including a deliberate do-not-install list. Curation beat accumulation.</div>
+  <div class="take"><span class="n a">4&ensp;</span> <strong>A good design agent ships state, not decoration.</strong> The refinement added STANDBY/RUNNING, live dB, correct band math, contrast fixes &mdash; meaning and correctness on top of a chosen aesthetic. Craft is the second half of taste.</div>
+  <div class="take"><span class="n a">5&ensp;</span> <strong>The agent&rsquo;s value compounds across the lifecycle.</strong> The same discipline that cast the variants kept paying off through stereo, marquee, a versioned service worker and a PWA install guide &mdash; the design language survived contact with real product work.</div>
+</section>
+
+<!-- ============ 9 GROUNDING ============ -->
+<section id="grounding" class="reveal">
+  <h2>Grounding &amp; method<span class="lvl deep">how this postmortem was built</span></h2>
+  <p class="lede">Every claim here traces to a file, a commit, or a live capture &mdash; no screenshots were imagined.</p>
+  <p>The screenshots in this report are <strong>live captures</strong>, not mockups: the five <code>/var</code> concepts and the winner were rendered by the actual v1 dev server and screen-captured at a 1280&times;900 viewport; the v2 shots were captured from the v2 dev server at desktop and mobile (390&times;844) sizes. Variant identities (fonts, radii, fills) were verified against the running page, not assumed from filenames.</p>
+  <p>The narrative arc &mdash; PM-doc-first birth &rarr; mobile+web monorepo &rarr; UI drift &rarr; five-cast redesign &rarr; UNIT-02 winner &rarr; v2 spin-out &rarr; continued polish &mdash; is grounded in the v1 git history (<code>1af4d93</code> &rarr; <code>d4ddb88</code>) and the v2 commit log. The agent-lineage claims are grounded in the agent definitions themselves (<code>frontend-craft.md</code>, <code>ux-worker/CAPABILITIES.md</code>) and the parallel scraping-lineage repos.</p>
+</section>
+
+<footer>
+  <p class="src">ambient-noise-app / ambient-noise-app-v2 &mdash; design-agent makeover postmortem &middot; 2026-09-05 &rarr; 09-06.</p>
+  <p>Primary sources: <code>ambient-noise-app</code> git log &amp; <code>repo/apps/web/src/app/var/**/page.tsx</code>; <code>ambient-noise-app-v2</code> README / LEARNINGS / commit log; agent defs <code>~/.omp/agent/agents/frontend-craft.md</code>, <code>agents/ux-worker/CAPABILITIES.md</code>; scraping-lineage repos (<code>cc-apify-plugin-v2/v3</code>, <code>scrape-ig-saved-list</code>, <code>social-media-strategy</code>). Screens: live captures of v1 <code>/var</code> routes and v2, staged in <code>screens/</code> beside this file.</p>
+</footer>
+
+</main>
+<script>
+(function(){
+  var root=document.documentElement;
+  var els=document.querySelectorAll('.reveal');
+  if(!('IntersectionObserver' in window)||window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    root.classList.add('js');
+    for(var i=0;i<els.length;i++){els[i].classList.add('in')}
+    return;
+  }
+  root.classList.add('js');
+  var io=new IntersectionObserver(function(en){
+    for(var i=0;i<en.length;i++){if(en[i].isIntersecting){en[i].target.classList.add('in');io.unobserve(en[i].target)}}
+  },{threshold:.08});
+  for(var j=0;j<els.length;j++){io.observe(els[j])}
+  var links=document.querySelectorAll('nav.toc a');
+  var secs=Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var tocIO=new IntersectionObserver(function(en){
+    for(var i=0;i<en.length;i++){if(en[i].isIntersecting){
+      var id=en[i].target.id;
+      for(var k=0;k<links.length;k++){links[k].classList.toggle('active',links[k].getAttribute('href')==='#'+id)}
+    }}
+  },{rootMargin:'-40% 0px -55% 0px'});
+  for(var m=0;m<secs.length;m++){tocIO.observe(secs[m])}
+})();
+</script>
+</body>
+</html>
