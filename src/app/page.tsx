@@ -176,6 +176,7 @@ export default function Var2ImprovedPage() {
   const [noise, setNoise] = useState<Noise>(PRESETS[0].noise)
   const [eq, setEq] = useState<number[]>(PRESETS[0].eq)
   const [volume, setVolume] = useState(60)
+  const [stereo, setStereo] = useState(true)
   const [lowCut, setLowCut] = useState(PRESETS[0].filters.lowCut)
   const [lowCutFreq, setLowCutFreq] = useState(PRESETS[0].filters.lowCutFreq)
   const [highCut, setHighCut] = useState(PRESETS[0].filters.highCut)
@@ -241,12 +242,18 @@ export default function Var2ImprovedPage() {
     [],
   )
 
+  const toggleStereo = (next: boolean) => {
+    setStereo(next)
+    engineRef.current?.setStereo(next)
+  }
+
   const togglePlay = async () => {
     try {
       const engine = await ensureEngine()
       if (!engine) return
       if (!engine.isPlaying()) {
         await engine.initialize()
+        engine.setStereo(stereo)
         pushStateToEngine(engine, {
           noise,
           eq,
@@ -301,7 +308,16 @@ export default function Var2ImprovedPage() {
         {/* status bar */}
         <Cell className="flex shrink-0 items-center justify-between px-4 py-2 text-[10px] uppercase tracking-widest text-foreground-muted md:px-5 md:text-[11px]">
           <span>AMBIENT NOISE — UNIT 02</span>
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-3">
+            <button
+              onClick={() => toggleStereo(!stereo)}
+              aria-label="Toggle stereo mode"
+              aria-pressed={stereo}
+              className="text-[10px] uppercase tracking-widest text-foreground-muted transition-colors hover:text-foreground md:text-[11px]"
+            >
+              {stereo ? 'STEREO' : 'MONO'}
+            </button>
+            <span className="flex items-center gap-2">
             <span
               className="inline-block h-2 w-2"
               style={{
@@ -311,6 +327,7 @@ export default function Var2ImprovedPage() {
               }}
             />
             {playing ? 'RUNNING' : 'STANDBY'}
+            </span>
           </span>
         </Cell>
 

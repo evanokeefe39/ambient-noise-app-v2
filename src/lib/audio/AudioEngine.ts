@@ -57,6 +57,7 @@ export class AudioEngine implements IAudioEngine {
   private _highCutFilter: BiquadFilterNode | null = null
   private _lowCutHz: number | null = null
   private _highCutHz: number | null = null
+  private _stereo = true
 
   // One source node + crossfade gain node per noise color
   private _sourceNodes: Partial<Record<NoiseColor, NoiseNode>> = {}
@@ -153,6 +154,7 @@ export class AudioEngine implements IAudioEngine {
     // Re-apply cut frequencies set before initialize()
     if (this._lowCutHz !== null) this.setLowCut(this._lowCutHz)
     if (this._highCutHz !== null) this.setHighCut(this._highCutHz)
+    this.setStereo(this._stereo)
   }
 
   async resume(): Promise<void> {
@@ -227,6 +229,26 @@ export class AudioEngine implements IAudioEngine {
         target,
         this._ctx.currentTime,
       )
+    }
+  }
+
+  // ── Stereo / mono ─────────────────────────────────────────────────────────
+
+  /**
+   * Toggle independent left/right stereo generation. When enabled the noise
+   * worklets emit two decorrelated channels; when disabled the master gain
+   * downmixes to mono (identical signal to both ears).
+   */
+  setStereo(enabled: boolean): void {
+    this._stereo = enabled
+    const master = this._masterGain
+    if (!master) return
+    if (enabled) {
+      master.channelCountMode = 'max'
+      master.channelCount = 2
+    } else {
+      master.channelCountMode = 'explicit'
+      master.channelCount = 1
     }
   }
 
@@ -429,7 +451,9 @@ export class AudioEngine implements IAudioEngine {
     }
 
     if (this._useWorklets && this._loadedWorklets.has(color)) {
-      node = new AudioWorkletNode(ctx, WORKLET_NAMES[color])
+      node = new AudioWorkletNode(ctx, WORKLET_NAMES[color], {
+        outputChannelCount: [2],
+      })
     } else {
       node = createFallbackNoiseNode(ctx, color)
     }
