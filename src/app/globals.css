@@ -263,9 +263,12 @@ canvas:focus-visible {
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  /* Exclude the preset-title marquee from the universal clamp: it is a
+     requested feature (it carries its own inline duration), not decorative
+     chrome, so it should still scroll when the OS asks for reduced motion. */
+  *:not(.preset-marquee):not(.preset-marquee *),
+  *:not(.preset-marquee):not(.preset-marquee *)::before,
+  *:not(.preset-marquee):not(.preset-marquee *)::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
