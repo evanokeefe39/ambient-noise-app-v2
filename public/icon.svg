@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ambient Noise UNIT-02 icon: ivory EQ bars on near-black -->
+  <rect width="512" height="512" fill="#0a0608"/>
+  <!-- 7 EQ bars centered in the maskable-safe zone -->
+  <g fill="#F9FFD0">
+    <rect x="78"  y="205" width="38" height="102"/>
+    <rect x="131" y="160" width="38" height="192"/>
+    <rect x="184" y="128" width="38" height="256"/>
+    <rect x="237" y="92"  width="38" height="328"/>
+    <rect x="290" y="150" width="38" height="212"/>
+    <rect x="343" y="186" width="38" height="140"/>
+    <rect x="396" y="212" width="38" height="88"/>
+  </g>
+</svg>
