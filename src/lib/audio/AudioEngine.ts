@@ -318,6 +318,10 @@ export class AudioEngine implements IAudioEngine {
 
   pause(): void {
     void this._ctx?.suspend()
+    // On the iOS media-stream bypass, the <audio> element is the actual audio
+    // sink and keeps playing even after the context suspends. Pause it too so
+    // pausing actually silences output (resume re-plays it in play()).
+    this._iosAudioEl?.pause()
     this._state = { ...this._state, isPlaying: false }
     this._notify()
   }
