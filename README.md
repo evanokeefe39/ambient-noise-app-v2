@@ -36,17 +36,57 @@ pnpm build
 pnpm start
 ```
 
-## Deploy
-
-Push to GitHub, import into Vercel (framework preset: Next.js). No environment
-variables, no build settings needed. `pnpm build` is the default build command.
-
 ## Installable PWA
 
-`public/manifest.json` + `public/sw.js` make the app installable on desktop and
-mobile (Chrome/Edge "Add to app", Safari "Add to Home Screen"). The service
-worker registers only in production builds. Icons: `icon.svg`, `icon-192.png`,
-`icon-512.png` (maskable-ready, generated to match the UNIT-02 look).
+`public/manifest.json` + a versioned service worker make the app installable on
+desktop and mobile. The service worker registers only in production builds and
+self-updates on each release. Icons: `icon.svg`, `icon-192.png`, `icon-512.png`
+(maskable-ready, generated to match the UNIT-02 look).
+
+### Add it to your home screen / desktop
+
+Open the app, then install it per platform. Installing gives it an icon and
+runs it in its own window (no browser tabs/URL bar), and the service worker
+keeps it updatable.
+
+**Android (Chrome, Edge, Brave, Firefox)**
+1. Open the app URL.
+2. Tap the browser **⋮** menu.
+3. Tap **Add to Home screen** (or **Install app**). Chrome/Edge/Brave may also
+   show an "Install app" banner prompt.
+4. Confirm the name and tap **Add** / **Install**.
+
+**iOS / iPadOS (Safari, Chrome, Edge, Brave)**
+1. Open the app URL in any browser.
+2. Tap the **Share** icon (square with up-arrow in the address bar), or the
+   **⋯** menu → **Share…**.
+3. Tap **Add to Home Screen**.
+4. Confirm the name and tap **Add**.
+> On iOS every browser is WebKit under the hood, so they all go through the
+> system share sheet. Safari is the most reliable path; Chrome/Edge work the
+> same way but via the share sheet.
+
+**Windows (Chrome, Edge, Brave)**
+1. Open the app URL.
+2. Click the install icon in the address bar, or the **⋯** menu →
+   **Install Ambient Noise** / **Apps → Install this site as an app**.
+3. Confirm and it pins to Start / taskbar.
+
+**Linux (Chrome, Edge, Brave, Chromium)**
+1. Open the app URL.
+2. Click the install icon in the address bar, or the **⋯** menu →
+   **Install Ambient Noise** / **Install app**.
+3. Confirm — it launches from the app menu / desktop.
+
+**macOS (Chrome, Edge, Safari)**
+1. Open the app URL.
+2. Chrome/Edge: click the install icon in the address bar, or the **⋯** menu →
+   **Install Ambient Noise**. Safari 17+: **File → Add to Dock**.
+3. Confirm — it opens in its own window.
+
+> **Tip — why install:** installed users get automatic updates. Each release
+> deploys a versioned service worker, so the app refreshes itself to the latest
+> build on the next open — no manual cache clearing when we ship changes.
 
 ## Project layout
 
