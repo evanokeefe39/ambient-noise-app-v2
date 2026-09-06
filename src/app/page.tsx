@@ -315,8 +315,8 @@ export default function Var2ImprovedPage() {
               aria-pressed={stereo}
               className={`border px-1.5 py-0.5 text-[10px] uppercase tracking-widest transition-colors md:text-[11px] ${
                 stereo
-                  ? 'border-border bg-surface text-foreground'
-                  : 'border-border text-foreground-muted hover:border-foreground/40 hover:text-foreground'
+                  ? 'border-border text-foreground'
+                  : 'border-border text-foreground-muted hover:text-foreground'
               }`}
             >
               {stereo ? 'STEREO' : 'MONO'}
