@@ -170,6 +170,87 @@ function ChevronButton({
   )
 }
 
+/**
+ * Preset name title. If the name overflows the box it shows truncated until a
+ * short delay elapses, then scrolls as a seamless marquee (duplicated text,
+ * translateX -50%). Pauses on hover; respects reduced motion.
+ */
+function PresetTitle({
+  name,
+  className,
+}: {
+  name: string
+  className?: string
+}) {
+  const boxRef = useRef<HTMLHeadingElement | null>(null)
+  const [rolling, setRolling] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+
+  // Re-measure whenever the name (or layout) changes; restart the roll clock.
+  useEffect(() => {
+    setRolling(false)
+    setOverflows(false)
+    let t: number
+    const measure = () => {
+      const box = boxRef.current
+      if (!box) return
+      const probe = box.querySelector<HTMLElement>('[data-probe]')
+      if (probe) setOverflows(probe.offsetWidth > box.clientWidth + 1)
+    }
+    t = window.setTimeout(measure, 120) // let fonts/layout settle
+    window.addEventListener('resize', measure)
+    return () => {
+      window.clearTimeout(t)
+      window.removeEventListener('resize', measure)
+    }
+  }, [name, className])
+
+  // Only roll when it actually overflows, and only after the text has been
+  // "selected" for a moment (so the full name is legible first).
+  useEffect(() => {
+    if (!overflows) {
+      setRolling(false)
+      return
+    }
+    const t = window.setTimeout(() => setRolling(true), 2200)
+    return () => window.clearTimeout(t)
+  }, [overflows, name])
+
+  const textW = boxRef.current
+    ? (boxRef.current.querySelector<HTMLElement>('[data-probe]')?.offsetWidth ?? 0)
+    : 0
+  const duration = `${Math.max(5, Math.round(textW / 40))}s`
+
+  return (
+    <h1
+      ref={boxRef}
+      className={`group relative min-w-0 flex-1 overflow-hidden text-xl font-bold uppercase tracking-tight md:w-[12.5ch] md:flex-none md:text-2xl ${className ?? ''}`}
+    >
+      {/* Hidden probe measures the true single-line text width. */}
+      <span
+        data-probe
+        aria-hidden
+        className="invisible absolute left-0 top-0 whitespace-nowrap"
+      >
+        {name}
+      </span>
+      {rolling ? (
+        <span
+          className="preset-marquee group-hover:[animation-play-state:paused]"
+          style={{ animationDuration: duration }}
+        >
+          <span>{name}</span>
+          <span aria-hidden>{name}</span>
+        </span>
+      ) : (
+        <span className="block overflow-hidden whitespace-nowrap text-ellipsis">
+          {name}
+        </span>
+      )}
+    </h1>
+  )
+}
+
 export default function Var2ImprovedPage() {
   const [playing, setPlaying] = useState(false)
   const [presetIndex, setPresetIndex] = useState(0)
@@ -351,9 +432,7 @@ export default function Var2ImprovedPage() {
                   onClick={() => cyclePreset(-1)}
                   label="Previous preset"
                 />
-                <h1 className="min-w-0 flex-1 truncate text-xl font-bold uppercase tracking-tight md:w-[12.5ch] md:flex-none md:text-2xl">
-                  {preset.name}
-                </h1>
+                <PresetTitle name={preset.name} />
                 <ChevronButton
                   dir="right"
                   onClick={() => cyclePreset(1)}
@@ -668,6 +747,23 @@ export default function Var2ImprovedPage() {
       </div>
 
       <style>{`
+        .preset-marquee {
+          display: inline-flex;
+          white-space: nowrap;
+          will-change: transform;
+          animation-name: preset-marquee;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+        @keyframes preset-marquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .preset-marquee {
+            animation: none !important;
+          }
+        }
         .eq-fader {
           -webkit-appearance: none;
           appearance: none;
