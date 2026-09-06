@@ -170,12 +170,94 @@ function ChevronButton({
   )
 }
 
+/**
+ * Preset name title. If the name overflows the box it shows truncated until a
+ * short delay elapses, then scrolls as a seamless marquee (duplicated text,
+ * translateX -50%). Pauses on hover; respects reduced motion.
+ */
+function PresetTitle({
+  name,
+  className,
+}: {
+  name: string
+  className?: string
+}) {
+  const boxRef = useRef<HTMLHeadingElement | null>(null)
+  const [rolling, setRolling] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+
+  // Re-measure whenever the name (or layout) changes; restart the roll clock.
+  useEffect(() => {
+    setRolling(false)
+    setOverflows(false)
+    let t: number
+    const measure = () => {
+      const box = boxRef.current
+      if (!box) return
+      const probe = box.querySelector<HTMLElement>('[data-probe]')
+      if (probe) setOverflows(probe.offsetWidth > box.clientWidth + 1)
+    }
+    t = window.setTimeout(measure, 120) // let fonts/layout settle
+    window.addEventListener('resize', measure)
+    return () => {
+      window.clearTimeout(t)
+      window.removeEventListener('resize', measure)
+    }
+  }, [name, className])
+
+  // Only roll when it actually overflows, and only after the text has been
+  // "selected" for a moment (so the full name is legible first).
+  useEffect(() => {
+    if (!overflows) {
+      setRolling(false)
+      return
+    }
+    const t = window.setTimeout(() => setRolling(true), 2200)
+    return () => window.clearTimeout(t)
+  }, [overflows, name])
+
+  const textW = boxRef.current
+    ? (boxRef.current.querySelector<HTMLElement>('[data-probe]')?.offsetWidth ?? 0)
+    : 0
+  const duration = `${Math.max(5, Math.round(textW / 40))}s`
+
+  return (
+    <h1
+      ref={boxRef}
+      className={`group relative min-w-0 flex-1 overflow-hidden text-xl font-bold uppercase tracking-tight md:w-[12.5ch] md:flex-none md:text-2xl ${className ?? ''}`}
+    >
+      {/* Hidden probe measures the true single-line text width. */}
+      <span
+        data-probe
+        aria-hidden
+        className="invisible absolute left-0 top-0 whitespace-nowrap"
+      >
+        {name}
+      </span>
+      {rolling ? (
+        <span
+          className="preset-marquee group-hover:[animation-play-state:paused]"
+          style={{ animationDuration: duration }}
+        >
+          <span>{name}</span>
+          <span aria-hidden>{name}</span>
+        </span>
+      ) : (
+        <span className="block overflow-hidden whitespace-nowrap text-ellipsis">
+          {name}
+        </span>
+      )}
+    </h1>
+  )
+}
+
 export default function Var2ImprovedPage() {
   const [playing, setPlaying] = useState(false)
   const [presetIndex, setPresetIndex] = useState(0)
   const [noise, setNoise] = useState<Noise>(PRESETS[0].noise)
   const [eq, setEq] = useState<number[]>(PRESETS[0].eq)
   const [volume, setVolume] = useState(60)
+  const [stereo, setStereo] = useState(true)
   const [lowCut, setLowCut] = useState(PRESETS[0].filters.lowCut)
   const [lowCutFreq, setLowCutFreq] = useState(PRESETS[0].filters.lowCutFreq)
   const [highCut, setHighCut] = useState(PRESETS[0].filters.highCut)
@@ -241,12 +323,18 @@ export default function Var2ImprovedPage() {
     [],
   )
 
+  const toggleStereo = (next: boolean) => {
+    setStereo(next)
+    engineRef.current?.setStereo(next)
+  }
+
   const togglePlay = async () => {
     try {
       const engine = await ensureEngine()
       if (!engine) return
       if (!engine.isPlaying()) {
         await engine.initialize()
+        engine.setStereo(stereo)
         pushStateToEngine(engine, {
           noise,
           eq,
@@ -301,7 +389,20 @@ export default function Var2ImprovedPage() {
         {/* status bar */}
         <Cell className="flex shrink-0 items-center justify-between px-4 py-2 text-[10px] uppercase tracking-widest text-foreground-muted md:px-5 md:text-[11px]">
           <span>AMBIENT NOISE — UNIT 02</span>
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-3">
+            <button
+              onClick={() => toggleStereo(!stereo)}
+              aria-label="Toggle stereo mode"
+              aria-pressed={stereo}
+              className={`w-14 border px-1.5 py-0.5 text-center text-[10px] uppercase tracking-widest transition-colors md:text-[11px] ${
+                stereo
+                  ? 'border-border text-foreground'
+                  : 'border-border text-foreground-muted hover:text-foreground'
+              }`}
+            >
+              {stereo ? 'STEREO' : 'MONO'}
+            </button>
+            <span className="flex items-center gap-2">
             <span
               className="inline-block h-2 w-2"
               style={{
@@ -311,6 +412,7 @@ export default function Var2ImprovedPage() {
               }}
             />
             {playing ? 'RUNNING' : 'STANDBY'}
+            </span>
           </span>
         </Cell>
 
@@ -330,9 +432,7 @@ export default function Var2ImprovedPage() {
                   onClick={() => cyclePreset(-1)}
                   label="Previous preset"
                 />
-                <h1 className="min-w-0 flex-1 truncate text-xl font-bold uppercase tracking-tight md:w-[12.5ch] md:flex-none md:text-2xl">
-                  {preset.name}
-                </h1>
+                <PresetTitle name={preset.name} />
                 <ChevronButton
                   dir="right"
                   onClick={() => cyclePreset(1)}
@@ -647,6 +747,23 @@ export default function Var2ImprovedPage() {
       </div>
 
       <style>{`
+        .preset-marquee {
+          display: inline-flex;
+          white-space: nowrap;
+          will-change: transform;
+          animation-name: preset-marquee;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+        @keyframes preset-marquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .preset-marquee {
+            animation: none !important;
+          }
+        }
         .eq-fader {
           -webkit-appearance: none;
           appearance: none;
