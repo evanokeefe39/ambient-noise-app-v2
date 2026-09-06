@@ -171,9 +171,9 @@ function ChevronButton({
 }
 
 /**
- * Preset name title. If the name overflows the box it shows truncated until a
- * short delay elapses, then scrolls as a seamless marquee (duplicated text,
- * translateX -50%). Pauses on hover; respects reduced motion.
+ * Preset name title. Every preset name scrolls right-to-left as a seamless
+ * marquee (duplicated text, translateX -50%): it shows the name at rest for a
+ * short moment, then starts sliding. Pauses on hover.
  */
 function PresetTitle({
   name,
@@ -182,53 +182,28 @@ function PresetTitle({
   name: string
   className?: string
 }) {
-  const boxRef = useRef<HTMLHeadingElement | null>(null)
+  const probeRef = useRef<HTMLSpanElement | null>(null)
   const [rolling, setRolling] = useState(false)
-  const [overflows, setOverflows] = useState(false)
 
-  // Re-measure whenever the name (or layout) changes; restart the roll clock.
+  // Every preset name slides, so just restart the roll clock on change.
   useEffect(() => {
     setRolling(false)
-    setOverflows(false)
-    let t: number
-    const measure = () => {
-      const box = boxRef.current
-      if (!box) return
-      const probe = box.querySelector<HTMLElement>('[data-probe]')
-      if (probe) setOverflows(probe.offsetWidth > box.clientWidth + 1)
-    }
-    t = window.setTimeout(measure, 120) // let fonts/layout settle
-    window.addEventListener('resize', measure)
-    return () => {
-      window.clearTimeout(t)
-      window.removeEventListener('resize', measure)
-    }
+    const t = window.setTimeout(() => setRolling(true), 1800)
+    return () => window.clearTimeout(t)
   }, [name, className])
 
-  // Only roll when it actually overflows, and only after the text has been
-  // "selected" for a moment (so the full name is legible first).
-  useEffect(() => {
-    if (!overflows) {
-      setRolling(false)
-      return
-    }
-    const t = window.setTimeout(() => setRolling(true), 2200)
-    return () => window.clearTimeout(t)
-  }, [overflows, name])
-
-  const textW = boxRef.current
-    ? (boxRef.current.querySelector<HTMLElement>('[data-probe]')?.offsetWidth ?? 0)
-    : 0
+  // Measure a single copy of the name for a proportional scroll speed.
+  const textW =
+    probeRef.current?.offsetWidth ?? Math.max(60, name.length * 12)
   const duration = `${Math.max(5, Math.round(textW / 40))}s`
 
   return (
     <h1
-      ref={boxRef}
       className={`group relative min-w-0 flex-1 overflow-hidden text-xl font-bold uppercase tracking-tight md:w-[12.5ch] md:flex-none md:text-2xl ${className ?? ''}`}
     >
-      {/* Hidden probe measures the true single-line text width. */}
+      {/* Hidden single-copy probe — used only for width measurement. */}
       <span
-        data-probe
+        ref={probeRef}
         aria-hidden
         className="invisible absolute left-0 top-0 whitespace-nowrap"
       >
@@ -758,11 +733,6 @@ export default function Var2ImprovedPage() {
         @keyframes preset-marquee {
           from { transform: translateX(0); }
           to { transform: translateX(-50%); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .preset-marquee {
-            animation: none !important;
-          }
         }
         .eq-fader {
           -webkit-appearance: none;
