@@ -10,8 +10,8 @@
    ============================================================ */
 @theme {
   /* Colors — Semantic (Dark mode defaults) */
-  --color-background: #181411;
-  --color-background-subtle: #15110f;
+  --color-background: #0a0608;
+  --color-background-subtle: #120a0c;
   --color-surface: #141420;
   --color-surface-elevated: #1e1e30;
   --color-surface-interactive: #252540;
@@ -23,7 +23,7 @@
   --color-primary-foreground: #ffffff;
   --color-accent: #f59e0b;
   --color-accent-hover: #fbbf24;
-  --color-accent-foreground: #181411;
+  --color-accent-foreground: #0a0608;
   --color-muted: #27273a;
   --color-muted-foreground: #9ca3af;
   --color-destructive: #ef4444;
@@ -126,8 +126,8 @@
    ============================================================ */
 :root {
   /* Semantic — Dark mode (default) */
-  --background: 26 17% 8%;
-  --background-subtle: 26 17% 5%;
+  --background: 330 25% 3%;
+  --background-subtle: 330 18% 5%;
   --surface: 240 20% 10%;
   --surface-elevated: 240 20% 15%;
   --surface-interactive: 240 20% 20%;
@@ -139,7 +139,7 @@
   --primary-foreground: 0 0% 100%;
   --accent: 38 92% 50%;
   --accent-hover: 44 96% 56%;
-  --accent-foreground: 26 17% 8%;
+  --accent-foreground: 330 25% 3%;
   --muted: 240 18% 19%;
   --muted-foreground: 220 9% 65%;
   --destructive: 0 84% 60%;
@@ -188,7 +188,7 @@
    Scoped to .hw-player — applies to Player panel, TapeDeck, and EQ only
    ============================================================ */
 .hw-player {
-  --hw-bg:      #181411;
+  --hw-bg:      #0a0608;
   --hw-panel:   #393b47;
   --hw-play:    #324063;
   --hw-inset:   #413326;
