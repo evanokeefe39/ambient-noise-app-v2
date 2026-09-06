@@ -465,7 +465,7 @@ export default function Var2ImprovedPage() {
               </svg>
             )}
           </button>
-          <Cell className="flex flex-col justify-between gap-2 bg-[#181411] p-3 md:gap-3 md:p-4">
+          <Cell className="flex flex-col justify-between gap-2 bg-[#0C0A08] p-3 md:gap-3 md:p-4">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-foreground-muted md:text-[11px]">
               <span>VOLUME</span>
               <span className="tabular-nums text-foreground">
