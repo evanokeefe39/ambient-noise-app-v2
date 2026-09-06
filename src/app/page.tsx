@@ -731,7 +731,7 @@ export default function Var2ImprovedPage() {
           animation-iteration-count: infinite;
         }
         .preset-marquee > span {
-          padding-right: 1.75ch;
+          padding-right: 6ch;
         }
         @keyframes preset-marquee {
           from { transform: translateX(0); }
