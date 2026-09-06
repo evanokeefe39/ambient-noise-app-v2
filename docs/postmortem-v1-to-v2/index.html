@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>From &ldquo;ui bumps&rdquo; to UNIT-02 — the design agent that finished a player</title>
-<meta name="description" content="A postmortem of the ambient-noise v1 &rarr; v2 redesign: how a design/UI-UX agent cast a generic dark player into five distinct design families, picked a winner, refined it into a coherent instrument, and shipped it web-only — and the scraper-fed taste corpus the agent runs on.">
+<title>I spent 5 months nudging a UI. Then I built the agent that finished it in a day.</title>
+<meta name="description" content="How ambient-noise went from a working player whose look drifted for five months of 'ui bump' commits to a cleaner, web-only instrument shipped in one day by a design agent I built and matured from scraped Instagram design posts. The proof it worked is not a mockup: it gets used, every night.">
 <!-- Design system: dev-portfolio-2 /landing (skin F — cool type-led terminal).
      Token source: components/landing/tokens.css. Body/data faces are the portfolio's
      own Google fonts (IBM Plex Sans/Mono); the portfolio's local DOS faces
@@ -70,7 +70,7 @@ nav.toc a.active{color:var(--ld-ink);border-bottom-color:var(--ld-accent)}
 
 /* hero */
 header.hero{padding:56px 0 30px}
-.hero h1{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:clamp(2.3rem,5.4vw,4.1rem);line-height:1.04;letter-spacing:.01em;max-width:22ch}
+.hero h1{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:clamp(2.1rem,4.9vw,3.6rem);line-height:1.06;letter-spacing:.01em;max-width:24ch}
 .hero h1 .after{color:var(--ld-accent)}
 .hero h1 .before{color:var(--ld-cat-amber)}
 .hero .dek{font-family:var(--body);font-size:clamp(1.05rem,1.8vw,1.2rem);line-height:1.6;color:var(--ld-ink-soft);max-width:64ch;margin-top:20px}
@@ -150,6 +150,14 @@ table.cast td .cap{font-family:var(--mono);font-size:11px;letter-spacing:.03em;c
 .ba li{margin:.35em 0}
 .ba strong{color:var(--ld-ink)}
 
+/* stat strip */
+.stat-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:1.8em 0;max-width:980px}
+.stat{background:var(--ld-card-bg);border:1px solid var(--ld-card-border);padding:16px 18px}
+.stat .n{font-family:var(--display);font-size:2rem;line-height:1;color:var(--ld-ink);font-weight:400}
+.stat .n.b{color:var(--ld-cat-amber)}
+.stat .n.a{color:var(--ld-accent)}
+.stat .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ld-ink-faint);display:block;margin-top:8px}
+
 /* takeaways */
 .take{margin:0 0 1.2em}
 .take .n{font-family:var(--mono);font-weight:600;color:var(--ld-accent);font-size:1em}
@@ -161,6 +169,9 @@ table.cast td .cap{font-family:var(--mono);font-size:11px;letter-spacing:.03em;c
 .phase .when{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ld-ink-faint);padding-top:4px}
 .phase h3{margin:0 0 .4em}
 .phase p{margin:0 0 .6em;max-width:78ch}
+/* figure gif frame */
+figure.gif .imgframe{background:#1c2733;border:1px solid var(--ld-card-border);padding:8px;border-radius:2px}
+figure.gif img{display:block;width:100%;height:auto;border-radius:1px;max-width:560px}
 footer{margin-top:64px;border-top:1px solid var(--ld-rule);padding:30px 0 60px;font-size:13px;color:var(--ld-ink-faint)}
 footer p{max-width:90ch;margin-bottom:.6em}
 footer .src{font-family:var(--mono);font-size:12px}
@@ -170,77 +181,53 @@ footer .src{font-family:var(--mono);font-size:12px}
 
 <div class="masthead">
   <div class="wrap">
-    <span class="kicker"><a href="#top">ambient-noise-app &rsaquo; postmortem</a></span>
-    <span class="kicker">design-agent makeover &middot; 2026-09-05 &rarr; 09-06</span>
+    <span class="kicker"><a href="#top">evan o&rsquo;keefe &rsaquo; design-agent makeover</a></span>
+    <span class="kicker">ambient-noise v1 &rarr; v2 &middot; a shipping story</span>
   </div>
 </div>
 
 <nav class="toc" aria-label="Article sections">
   <div class="wrap">
     <a href="#brief">Bottom line</a>
-    <a href="#scene">The scene</a>
-    <a href="#cast">The five casts</a>
-    <a href="#winner">The winner</a>
-    <a href="#ship">Ship as v2</a>
-    <a href="#lineage">Agent lineage</a>
-    <a href="#before">Before / after</a>
-    <a href="#takeaways">Takeaways</a>
-    <a href="#grounding">Grounding</a>
+    <a href="#scene">The drift</a>
+    <a href="#day">The day</a>
+    <a href="#proof">Used, not just shipped</a>
+    <a href="#lesson">The lesson</a>
   </div>
 </nav>
 
 <header class="hero">
   <div class="wrap">
-    <h1>From <span class="before">&ldquo;ui bumps&rdquo;</span> to <span class="after">UNIT-02</span>: the design agent that finished a player.</h1>
-    <p class="dek">For five months ambient-noise was a working audio toy whose UI was pushed forward one &ldquo;ui bump&rdquo; at a time &mdash; a tape deck whose look drifted and never settled. In a single day a design/UI-UX agent cast the same player into <strong>five distinct design families</strong>, picked one, refined it into a coherent instrument, and shipped it as a clean web-only v2. This is the postmortem of that day &mdash; and of the scraper-fed taste corpus the agent stands on.</p>
+    <h1>I spent <span class="before">5 months nudging</span> a UI. Then I built <span class="after">the agent</span> that finished it in a day.</h1>
+    <p class="dek">ambient-noise is a white-noise player I actually use, most nights. For five months its look drifted one &ldquo;ui bump&rdquo; at a time. Then I stopped hand-nudging it and gave the design work a real owner: a design agent I built, fed on scraped Instagram taste, and matured until it shipped a cleaner, simpler, web-only version &mdash; in a day. This is how that happened, and the scope-explosion it taught me to stop doing.</p>
     <div class="byline">
-      <span>Postmortem &middot; grounded in ambient-noise-app commits 1af4d93 &rarr; d4ddb88 &amp; ambient-noise-app-v2</span>
-      <span>Design-agent value story</span>
+      <span>First-person engineering postmortem &middot; grounded in git history + live captures</span>
+      <span>for: engineers &middot; the people I might work for or with</span>
     </div>
     <div class="legend">
-      <span class="key"><span class="chip b"></span>&nbsp; before &mdash; generic &middot; manual &middot; drifting</span>
-      <span class="key"><span class="chip a"></span>&nbsp; after &mdash; coherent &middot; crafted &middot; shipped</span>
+      <span class="key"><span class="chip b"></span>&nbsp; before &mdash; drifting &middot; hand-nudged</span>
+      <span class="key"><span class="chip a"></span>&nbsp; after &mdash; owned &middot; shipped &middot; used</span>
     </div>
   </div>
 </header>
-
-<!-- ============ FIGURE: the transformation ============ -->
-<figure class="wrap reveal">
-  <div class="diag-title">Figure 1 &mdash; the whole arc on one screen: five casts &rarr; one refined winner &rarr; shipped v2</div>
-  <div class="shot-grid">
-    <figure class="shot"><div class="imgframe"><img src="screens/v1-var1.webp" alt="Variant 1 — Aurora"></div><div class="cap"><b>1 Aurora</b>soft glass / glow wellness</div></figure>
-    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2.webp" alt="Variant 2 — Terminal"></div><div class="cap"><b>2 Terminal</b>brutalist / minimal mono grid</div></figure>
-    <figure class="shot"><div class="imgframe"><img src="screens/v1-var3.webp" alt="Variant 3 — Fader Desk"></div><div class="cap"><b>3 Fader Desk</b>warm analog / physical material</div></figure>
-    <figure class="shot"><div class="imgframe"><img src="screens/v1-var4.webp" alt="Variant 4 — Score"></div><div class="cap"><b>4 Score</b>editorial typographic</div></figure>
-    <figure class="shot"><div class="imgframe"><img src="screens/v1-var5.webp" alt="Variant 5 — Nocturne"></div><div class="cap"><b>5 Nocturne</b>subtle 3D / sculpted surface</div></figure>
-    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2-improved.webp" alt="2-improved — the winner, Terminal UNIT-02"></div><div class="cap"><b>2-improved</b>Terminal &mdash; improved &middot; the pick</div></figure>
-  </div>
-  <figcaption>Six pages under <code>/var</code> in the v1 dev source: the redesign cast the player into five distinct design families, then refined the Terminal concept across three rounds into the winner. (The <code>/var</code> routes were never deployed &mdash; the live ambz.vercel.app served the pre-redesign player above.) Screens captured live from the v1 dev server.</figcaption>
-</figure>
 
 <main class="wrap">
 
 <!-- ============ 1 BOTTOM LINE ============ -->
 <section id="brief" class="reveal">
-  <h2>Bottom line<span class="lvl brief">60-second brief</span></h2>
-  <div class="take"><span class="n b">1&ensp;</span> For ~5 months ambient-noise was a <strong>working but aesthetically drifting</strong> product: the git log reads &ldquo;ui bump,&rdquo; &ldquo;uiux bump,&rdquo; &ldquo;needs more ui updates,&rdquo; &ldquo;v2 ui&rdquo; &mdash; iterative nudges that never resolved into a settled design language.</div>
-  <div class="take"><span class="n b">2&ensp;</span> The fix was not more nudges. A <strong>design/UI-UX agent</strong> (the frontend-craft / ux-worker lineage) cast the one player into <strong>five distinct design families</strong> in a single day &mdash; Aurora, Terminal, Fader Desk, Score, Nocturne &mdash; then refined the Terminal concept across three rounds into <strong>UNIT-02</strong>.</div>
-  <div class="take"><span class="n a">3&ensp;</span> The winner was <strong>shipped as a clean web-only v2</strong> (flat Next.js PWA), and then kept getting real polish &mdash; independent L/R stereo, a MONO/STEREO toggle, marquee preset names, a versioned service worker for reliable PWA updates. Craft, not just a static mockup.</div>
-  <div class="take"><span class="n a">4&ensp;</span> The agent itself is <strong>not magic</strong> &mdash; it is the endpoint of a long, deliberate pipeline that scraped and curated real Instagram design inspiration into a taste corpus, then formalised that corpus into skills an implementer auto-loads. The ambient-noise makeover is that pipeline&rsquo;s best proof.</div>
+  <h2>Bottom line<span class="lvl brief">60-second version</span></h2>
+  <p class="lede">I was not shipping design worse because I lacked taste. I was shipping it worse because the work had no owner with a method.</p>
+  <div class="take"><span class="n b">1&ensp;</span> For ~5 months ambient-noise was a <strong>working but drifting</strong> product: the log reads &ldquo;ui bump,&rdquo; &ldquo;uiux bump,&rdquo; &ldquo;v2 ui,&rdquo; &ldquo;needs more ui updates.&rdquo; Each change looked reasonable in isolation. None landed.</div>
+  <div class="take"><span class="n a">2&ensp;</span> I stopped nudging and <strong>built a design agent</strong> to own the whole thing: cast real alternatives, pick one, refine it, wire it to the engine, ship it. Off the shelf this is not. I sourced the taste, built the stack, and matured it over weeks.</div>
+  <div class="take"><span class="n a">3&ensp;</span> The agent produced five distinct design families in one day, refined a winner into <strong>UNIT-02</strong>, and pushed me toward a decision I had been avoiding: <strong>rip out the would-be iOS app</strong> and ship a lean web-only &ldquo;save to home screen&rdquo; PWA. Reuse what the platform already gives you.</div>
+  <div class="take"><span class="n a">4&ensp;</span> The result is not a mockup. <strong>I use it, most nights.</strong> Which is more than I can say for spectr, the DAW I built next and never opened. Perfect is the enemy of good, and good is the enemy of useful.</div>
 </section>
 
-<!-- ============ 2 SCENE ============ -->
+<!-- ============ 2 THE DRIFT ============ -->
 <section id="scene" class="reveal">
-  <h2>The scene<span class="lvl brief">what shipped before</span></h2>
-  <p class="lede">A real audio engine, wearing a generic &mdash; and drifting &mdash; face.</p>
-  <p>ambient-noise began in Feb 2026 as a PM-doc-first project (<code>requirements and docs</code>, <code>product mgtm docs completed enough for mvp</code>, <code>phase 0 + 1 generated</code>). It grew a genuine Web Audio engine &mdash; white/pink/brown noise, a configurable EQ, cut filters &mdash; first toward a mobile (Expo/React Native) app, then toward the web. The engine was real; the interface was a moving target.</p>
-
-  <figure class="shot-grid reveal">
-    <figure class="shot"><div class="imgframe"><img src="screens/v1-original-desktop.webp" alt="The original ambient-noise v1, desktop"></div><div class="cap"><b>the original, desktop</b>live at ambz.vercel.app &mdash; preset playing, EQ curve shown</div></figure>
-    <figure class="shot"><div class="imgframe"><img src="screens/v1-original-mobile.webp" alt="The original ambient-noise v1, mobile"></div><div class="cap"><b>the original, mobile</b>the tape-deck player &mdash; <em>P02: Block Snoring</em> playing, response curve drawn live</div></figure>
-  </figure>
-  <p>This is the pre-redesign player, live at <strong>ambz.vercel.app</strong> &mdash; consent and the &ldquo;what brings you here&rdquo; onboarding clicked through, <em>P02: Block Snoring</em> loaded and playing so the EQ curve actually gets drawn. It is a full-featured tape-deck product (the richer, mobile-rooted v1): a <strong>hardware-panel</strong> surface (SET / FLAT / DEVICE / SLP) in <strong>Inter</strong>, an EQ edited band-by-band through a focused detail panel (BAND 1 &middot; 31&nbsp;Hz &middot; gain &amp; Q &middot; PK/LS/HS/LP/HP/NT types), P/W/B noise selectors, a segmented meter, and preset chips (P01: Deep Sleep). It is dense and capable but visually busy &mdash; a control panel that reads as instrument internals rather than a settled identity. The redesign replaced that design language wholesale with the far more coherent UNIT-02, keeping the interaction ideas worth keeping: presets, cut filters, an EQ you can read at a glance.</p>
-  <p>Look at the commit subjects between the first player and the redesign and the pattern is unmistakable &mdash; a <em>tape deck</em> whose look was nudged, not decided:</p>
+  <h2>The drift<span class="lvl brief">what &ldquo;hand-nudged&rdquo; actually looks like</span></h2>
+  <p class="lede">A real audio engine, wearing a generic and drifting face.</p>
+  <p>ambient-noise started in Feb 2026 as a PM-doc-first project, and it grew a genuine Web Audio engine: white/pink/brown noise, a configurable EQ, cut filters. The engine was real. The interface was a moving target, and the git log says why:</p>
   <div class="callout reveal">
     <span class="tag">the drift, verbatim</span>
     <ul>
@@ -250,150 +237,113 @@ footer .src{font-family:var(--mono);font-size:12px}
       <li><code>2026-02-24&ensp;ui bump</code></li>
       <li><code>2026-02-24&ensp;bug fix</code> &middot; <code>2026-02-26&ensp;fix: stub audio engine to unblock dev client build</code></li>
     </ul>
-    <p>Five months of shipping a thing that works, wrapped in a surface that keeps changing by small degrees and never lands. There is no coherent &ldquo;why this looks like this.&rdquo;</p>
+    <p>That pattern ran for five months and ~43 commits: a surface changed by small degrees and never settled, because every change was a nudge with no direction behind it.</p>
   </div>
-  <p><strong>The constraint was never engineering.</strong> The audio graph, EQ math, autoplay handling &mdash; all there and working. The gap was <em>taste</em>: a defensible visual direction, chosen from real alternatives, executed with consistency. That is exactly the problem a design/UI-UX agent is built to take off a human&rsquo;s plate.</p>
-</section>
-
-<!-- ============ 3 THE FIVE CASTS ============ -->
-<section id="cast" class="reveal">
-  <h2>The five casts<span class="lvl brief">the redesign day</span></h2>
-  <p class="lede">One player, five design families &mdash; so the choice is real, not a vibe.</p>
-  <p>The agent did not pick a theme and build it. It <strong>cast alternatives</strong>: take the same controls &mdash; big play/pause, volume, eight vertical band sliders &mdash; and render them in five genuinely distinct design languages. The comparison index (<code>/var</code>) frames it plainly:</p>
-  <blockquote class="pull">&ldquo;The same minimal dark player &hellip; cast in five distinct design families. Static + local interaction only; no audio engine, nothing persisted.&rdquo;<span class="where">&mdash; /var comparison index, verbatim</span></blockquote>
-  <figure class="shot single reveal">
-    <div class="imgframe"><img src="screens/v1-five-concepts.webp" alt="The five-concepts comparison index"></div>
-    <figcaption>The comparison landing page that lays out all five concepts side by side &mdash; the &ldquo;taste menu&rdquo; the pick is made against.</figcaption>
+  <figure class="shot-grid reveal">
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-original-desktop.webp" alt="The pre-redesign ambient-noise player, desktop, P02 playing with the EQ curve drawn"></div><div class="cap"><b>the drifting face, desktop</b>live at ambz.vercel.app &mdash; preset playing, EQ curve drawn</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-original-mobile.webp" alt="The pre-redesign player on mobile, P02 Block Snoring playing"></div><div class="cap"><b>the drifting face, mobile</b>dense tape-deck &mdash; band EQ, P/W/B noise, meter</div></figure>
   </figure>
-  <table class="cast">
-    <thead><tr><th>#</th><th>Concept</th><th>Design family</th><th>Signature (verified live)</th><th>Verdict</th></tr></thead>
-    <tbody>
-      <tr><td>1</td><td><strong>Aurora</strong></td><td>soft glass / glow wellness</td><td>Inter, fully rounded pill controls, 48&nbsp;px title, breathing aura &mdash; wellness-app idiom.</td><td><span class="drop">Cast &middot; not picked</span></td></tr>
-      <tr><td>2</td><td><strong>Terminal</strong></td><td>brutalist / minimal mono grid</td><td>JetBrains Mono, <strong>zero radius</strong>, square controls, hard rules, segmented meter &mdash; the player as an instrument panel.</td><td><span class="pick">Pick &rarr; refined</span></td></tr>
-      <tr><td>3</td><td><strong>Fader Desk</strong></td><td>warm analog / physical material</td><td>Space Mono, rounded-4px, amber backlit nameplate, chunky hardware &mdash; studio-console warmth.</td><td><span class="drop">Cast &middot; not picked</span></td></tr>
-      <tr><td>4</td><td><strong>Score</strong></td><td>editorial typographic</td><td>Inter, 72&nbsp;px lowercase giant headline, hairline rules &mdash; magazine layout.</td><td><span class="drop">Cast &middot; not picked</span></td></tr>
-      <tr><td>5</td><td><strong>Nocturne</strong></td><td>subtle 3D / sculpted surface</td><td>Inter, rounded pills, near-black sculpted fills, raised play puck &mdash; depth via material.</td><td><span class="drop">Cast &middot; not picked</span></td></tr>
-    </tbody>
-  </table>
-  <p>The whole point of a <strong>cast</strong> rather than a single guess: it makes the design decision explicit and reviewable. A human (or the taste stage) looks at five honest, distinct directions and picks &mdash; instead of rubber-stamping whichever theme an agent happened to generate. Four are rejected loudly; one is chosen deliberately.</p>
+  <p>This is what shipped before the redesign, captured live from ambz.vercel.app. It is a capable tape-deck product: a hardware-panel surface (SET / FLAT / DEVICE / SLP), an EQ edited band-by-band through a focused detail panel, P/W/B noise selectors, a meter, presets. Dense, functional, and busy. It reads as instrument internals, not a settled identity. Here it is with <em>P02: Block Snoring</em> playing so you can see the EQ curve.</p>
+  <div class="pull">I told an agent to &ldquo;make an awesome UI, no mistakes,&rdquo; and this is what that produced. Asking harder is not a design method.<span class="where">what I kept getting wrong</span></div>
 </section>
 
-<!-- ============ 4 THE WINNER ============ -->
-<section id="winner" class="reveal">
-  <h2>The winner<span class="lvl brief">Terminal &rarr; UNIT-02</span></h2>
-  <p class="lede">The Terminal concept won &mdash; and then had to earn the win across three rounds of refinement.</p>
-  <p>The Terminal identity &mdash; <em>brutalist / minimal mono grid: hard 1px rules, zero radius, square controls, the player as an instrument panel</em> &mdash; is a coherent, defensible direction with a strong point of view. But picking it was only the start. The commit trail shows the refinement loop that took a concept to a finished instrument:</p>
+<!-- ============ 3 THE DAY ============ -->
+<section id="day" class="reveal">
+  <h2>The day<span class="lvl brief">a design agent, owned not rented</span></h2>
+  <p class="lede">The fix was not more nudges. It was giving the design an owner with a method.</p>
+  <p>So I built one. Not &ldquo;the agent&rdquo; as a generic helper &mdash; a specific design-agent stack I assembled and matured: <code>ux-worker</code> owns design taste and briefs an implementer, and <code>frontend-craft</code> executes with an anti-slop craft bar. What those two know how to do, they know because I spent months scraping and curating real Instagram design content into a queryable corpus of taste, then formalised that into skills. Off the shelf, it would have produced more of the same. I was the one who made it good, and I keep making it better.</p>
+  <p>On 2026-09-05 the agent did in one day what five months of nudging could not. It did not pick a theme and build it. It <strong>cast alternatives</strong>: the same player, rendered in five genuinely distinct design languages, so the choice was real instead of vibes.</p>
+  <figure class="shot-grid reveal">
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var1.webp" alt="Variant 1 — Aurora"></div><div class="cap"><b>1 Aurora</b>soft glass / glow wellness</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2.webp" alt="Variant 2 — Terminal"></div><div class="cap"><b>2 Terminal</b>brutalist / minimal mono grid</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var3.webp" alt="Variant 3 — Fader Desk"></div><div class="cap"><b>3 Fader Desk</b>warm analog / physical material</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var4.webp" alt="Variant 4 — Score"></div><div class="cap"><b>4 Score</b>editorial typographic</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var5.webp" alt="Variant 5 — Nocturne"></div><div class="cap"><b>5 Nocturne</b>subtle 3D / sculpted surface</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2-improved.webp" alt="2-improved — the winner, Terminal UNIT-02"></div><div class="cap"><b>2-improved</b>Terminal &mdash; improved &middot; the pick</div></figure>
+  </figure>
+  <p>Terminal won: brutalist, minimal, mono grid. Hard 1px rules, zero radius, square controls. The player as an instrument panel. Then the real work: the agent <strong>refined it into UNIT-02 across three rounds</strong>, adding state and meaning rather than decoration &mdash; a STANDBY/RUNNING lamp, live dB with a 0&nbsp;dB neutral rule, a proper 63&nbsp;Hz&ndash;8&nbsp;kHz octave band set, retro noise fills &mdash; and finally wired the whole surface to the real AudioEngine.</p>
   <div class="phases">
-    <div class="phase"><div class="when">cast</div><div><h3><code>0c2ac23</code> add 5 minimal dark player UI redesign variants</h3><p>The five casts land at <code>/var/1&hellip;5</code>.</p></div></div>
-    <div class="phase"><div class="when">refit</div><div><h3><code>a68fd6d</code> refit UI variants to 8-band vertical EQ, viewport-fit</h3><p>Harmonise the winner around the real control surface &mdash; a proper 8-band vertical EQ that fits the viewport.</p></div></div>
-    <div class="phase"><div class="when">improve</div><div><h3><code>bfb050b</code> add improved var2 player with preset nav, dB EQ, cut filters</h3><p>The interactive round: preset navigation, live dB readouts, low/high-cut filters.</p></div></div>
-    <div class="phase"><div class="when">polish</div><div><h3><code>4da94c4</code>&hellip;<code>d4ddb88</code> var2-improved: black faders, fixed chevrons, EQ collapse, noise fills, AA fixes, wired to engine</h3><p>Six polish commits tightening alignment, spacing, contrast and finally wiring the whole surface to the real AudioEngine.</p></div></div>
+    <div class="phase"><div class="when">cast</div><div><h3><code>0c2ac23</code> add 5 minimal dark player UI redesign variants</h3><p>The five casts land.</p></div></div>
+    <div class="phase"><div class="when">refit</div><div><h3><code>a68fd6d</code> refit UI variants to 8-band vertical EQ, viewport-fit</h3><p>Harmonise the winner around the real control surface.</p></div></div>
+    <div class="phase"><div class="when">improve</div><div><h3><code>bfb050b</code> add improved var2 player with preset nav, dB EQ, cut filters</h3><p>Preset navigation, live dB readouts, low/high-cut filters.</p></div></div>
+    <div class="phase"><div class="when">ship</div><div><h3><code>d4ddb88</code>&hellip; var2-improved wired to the engine</h3><p>Polish, then wire the whole surface to the real audio.</p></div></div>
   </div>
-  <div class="callout reveal">
-    <span class="tag">the identity, verbatim</span>
-    <p>&ldquo;Variant 2-improved &mdash; &lsquo;Terminal / UNIT 02&rsquo; evolved. Preserves the instrument-panel identity: hard 1px rules, square controls, zero radius, uppercase JetBrains Mono, STANDBY/RUNNING lamp, segmented meter, h-dvh viewport fit, eight vertical faders.&rdquo;</p>
-  </div>
-  <p>Notice what the refinement adds: <strong>state and meaning</strong>, not decoration. A STANDBY/RUNNING lamp. Live dB with a 0&nbsp;dB neutral rule. A proper 63&nbsp;Hz&ndash;8&nbsp;kHz octave band set (the earlier variants still used the legacy 31&nbsp;Hz&ndash;16&nbsp;kHz labels). 70s-retro noise fills (cream/salmon/burnt-orange) for the three colors. This is where a design agent earns its keep &mdash; the pick was taste, but the shipping was craft: every element justified, nothing decorative left floating.</p>
-</section>
-
-<!-- ============ 5 SHIP AS V2 ============ -->
-<section id="ship" class="reveal">
-  <h2>Ship as v2<span class="lvl brief">web-only, flat, installable</span></h2>
-  <p class="lede">From a winning page inside a monorepo to a clean, web-only product in one move.</p>
-  <p>The v1 repo was a pnpm monorepo (Expo mobile + web + shared/UI packages) whose git root sat at the parent directory. The win was a single page buried in it. The spin-out took exactly that surface &mdash; <em>check what a surface actually imports, not what the package exports</em> &mdash; and vendored only what UNIT-02 really used: ~6 type definitions plus an EQ constant. No monorepo, no workspace packages.</p>
   <figure class="shot single reveal">
-    <div class="imgframe"><img src="screens/v2-desktop.webp" alt="ambient-noise v2 — UNIT-02 player, desktop"></div>
-    <figcaption>ambient-noise v2: the finished UNIT-02 instrument, desktop view &mdash; STANDBY/RUNNING lamp, STEREO toggle, preset navigator, dB EQ, retro noise fills.</figcaption>
+    <div class="imgframe"><img src="screens/v2-desktop.webp" alt="ambient-noise v2 — the finished UNIT-02 instrument, desktop"></div>
+    <figcaption>ambient-noise v2: the finished UNIT-02 instrument &mdash; STANDBY/RUNNING lamp, STEREO toggle, preset navigator, dB EQ, retro noise fills.</figcaption>
   </figure>
-  <div class="shot-grid">
-    <figure class="shot"><div class="imgframe"><img src="screens/v2-mobile.png" alt="ambient-noise v2 — mobile viewport"></div><div class="cap"><b>v2 mobile</b>a mobile-first PWA, no vertical scroll at target sizes</div></figure>
-    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2-improved.webp" alt="the v1 winner it shipped from"></div><div class="cap"><b>v2&rsquo;s parent</b>the v1 winner it shipped from</div></figure>
-  </div>
-  <p>And v2 did not stop at the static win &mdash; it kept receiving genuine feature polish, now on a clean base:</p>
-  <table>
-    <thead><tr><th>Commit</th><th>What landed</th></tr></thead>
-    <tbody>
-      <tr class="adopt"><td><code>400275d</code> (v2 init)</td><td>flat web-only UNIT-02 noise instrument (PWA)</td></tr>
-      <tr class="adopt"><td><code>92b000b</code></td><td>independent L/R stereo noise with a MONO/STEREO toggle</td></tr>
-      <tr class="adopt"><td><code>9f81388</code> (PR&nbsp;#1)</td><td>stereo mode, marquee preset names, styled toggle &mdash; the first PR</td></tr>
-      <tr class="adopt"><td><code>e84dfd8</code>&hellip;<code>10c34f7</code></td><td>marquee preset names + reduced-motion interplay across engines</td></tr>
-      <tr class="adopt"><td><code>f271489</code></td><td>versioned service worker for reliable PWA updates</td></tr>
-      <tr class="adopt"><td><code>1c6199d</code></td><td>per-platform &ldquo;add to home screen&rdquo; install guide</td></tr>
-    </tbody>
-  </table>
-  <p>The v2 README states the identity plainly and correctly: <em>&ldquo;a single screen in the UNIT-02 aesthetic: a brutalist mono instrument panel with hard 1px rules, square controls, JetBrains Mono, and a STANDBY/RUNNING lamp.&rdquo;</em> A design language you can state in one sentence is a design language that survived contact with an implementer, three rounds of refinement, a repo spin-out, and a PWA deploy.</p>
-</section>
-
-<!-- ============ 6 AGENT LINEAGE ============ -->
-<section id="lineage" class="reveal">
-  <h2>Under the hood<span class="lvl deep">the agent that did it</span></h2>
-  <p class="lede">The makeover is the proof; this is the pipeline that produced the agent.</p>
-  <p>The redesign of 2026-09-05 is not an isolated feat &mdash; it is the visible output of a deliberately-built design-agent stack, and that stack itself was <em>derived from</em> months of earlier work scraping and analysing Instagram design content. The lineage runs in two parallel threads that finally met.</p>
-
-  <h3>Thread one &mdash; from saved posts to an agent-queryable design corpus</h3>
-  <p>Before there was a design agent, there was a pipeline for turning <em>saved Instagram design posts</em> into a machine-readable corpus. The chain that seeded it runs: <code>scrape-ig-saved-list</code> &rarr; <code>agent-knowledgebase</code> &rarr; <code>datalake</code>.</p>
-  <ul class="prose" style="margin:0 0 1.3em 1.2em">
-    <li><code>scrape-ig-saved-list</code> scrapes posts from a saved-list export via Apify (HAR-capture parsing of the saved GraphQL), downloads each post&rsquo;s media to disk, and extracts reusable knowledge with Gemini.</li>
-    <li><code>agent-knowledgebase</code> is where that becomes an <em>agent-queryable</em> knowledge layer &mdash; its first domain is explicitly <strong>UI/UX &amp; design</strong> (<code>corpora/uiux.yaml</code>; a <code>uiux</code> gold corpus of creators, domains, posts, tools), exposed to coding agents as a tool/skill/plugin via REST + CLI. This is the <em>bridge</em>: scraped taste, structured for an agent to consult.</li>
-    <li><code>datalake</code> is the packaged, medallion-architected successor (Dagster + Parquet + DuckDB) that the IG pipeline migrated into.</li>
-  </ul>
-  <p>That corpus is why ambient-noise&rsquo;s <code>ux-design/</code> folder holds ~90 reference images &mdash; tape-reel UI mockups, VFD displays, Technics hardware, retro-vintage aesthetics. <strong>The design families the agent casts are not invented in a vacuum; they are assembled from a collected, curated, agent-queryable visual vocabulary.</strong></p>
-
-  <h3>Thread two &mdash; the agent stack (what executes the taste)</h3>
-  <p>Formalised on the same day as the redesign (2026-09-05), both live as subagents in global config under <code>~/.omp/agent/agents/</code>: <code>ux-worker</code> is the orchestrator that owns design taste and briefs an implementer; <code>frontend-craft</code> is that implementer &mdash; a frontend specialist for <em>craft-and-anti-slop</em> quality that auto-loads the <code>impeccable</code> audit engine, <code>web-design-guidelines</code>, <code>vercel-react-best-practices</code>, and a taste-skill (<code>design-taste-frontend</code>), and routes heavier engines (<code>ui-ux-pro-max</code>, <code>interface-design</code>, <code>hue</code>, <code>scroll-craft</code>) on demand by concern.</p>
-  <p>The <code>ux-worker/CAPABILITIES.md</code> registry encodes the whole doctrine as a concern taxonomy &mdash; craft floor, taste direction, design intelligence, product-UI continuity, brand&rarr;tokens, motion, mobile-first &mdash; and its classification scan is drawn directly from the <code>agent-knowledgebase</code> UI/UX corpus. It also records a <strong>classified-and-rejected list</strong>: skills researched and deliberately not installed (phantom repos, stale derivative aggregates, license-gated ones). Building the stack was curation, not accumulation.</p>
-  <blockquote class="pull">The redesign loop was the real-world rehearsal of the process the agents were built for: cast &ge;5 aesthetic variants from &ge;3 design families, pick one against a declared spec, implement with a craft-skilled agent, audit it, ship.<span class="where">&mdash; ux-worker / frontend-craft operating doctrine</span></blockquote>
-  <p>So the makeover was not an agent doodling a prettier UI. It was the output of a pipeline that scraped the web for taste, curated that taste into a vocabulary and then into skills, and let a small specialised agent do &mdash; in one day, with visible alternatives and a reviewable pick &mdash; what five months of &ldquo;ui bumps&rdquo; could not.</p>
-</section>
-
-<!-- ============ 7 BEFORE / AFTER ============ -->
-<section id="before" class="reveal">
-  <h2>Before / after<span class="lvl brief">what actually changed</span></h2>
-  <p class="lede">Not prettier &mdash; decided, and shippable.</p>
+  <h3>The move that mattered most: make it smaller</h3>
+  <p>The v1 repo was a pnpm monorepo pointed at an Expo/iOS app. The agent did not build that iOS app out. It argued the opposite direction, and I agreed: <strong>rip the native path out entirely</strong> and ship a flat, web-only PWA. The install story became the browser&rsquo;s own &ldquo;save to home screen,&rdquo; which is real, works offline, and cost nothing to build. Fewer platforms, fewer packages, one surface. v2 is 16 commits from init to where it stands now.</p>
+  <figure class="shot single reveal">
+    <div class="imgframe"><img src="screens/v2-mobile.png" alt="ambient-noise v2 on a phone viewport"></div>
+    <figcaption>One screen at phone size, no vertical scroll &mdash; the &ldquo;save to home screen&rdquo; target. This is what I open at night.</figcaption>
+  </figure>
   <div class="ba before after">
     <div class="col before"><h4>Before</h4><span class="colk">the drifting tape deck</span>
       <ul>
-        <li>Working audio, <strong>wandering surface</strong>: &ldquo;ui bump,&rdquo; &ldquo;uiux bump,&rdquo; &ldquo;needs more ui updates.&rdquo;</li>
-        <li><strong>No defensible direction</strong> &mdash; a look that changed by small degrees without ever landing.</li>
-        <li>Legacy 31&nbsp;Hz&ndash;16&nbsp;kHz EQ labels that didn&rsquo;t match the UI&rsquo;s own band names.</li>
+        <li>A pnpm monorepo pointed at a native iOS app target.</li>
+        <li>Working audio, wandering surface: &ldquo;ui bump&rdquo; x 43 commits.</li>
         <li>No stated identity you could hold an implementer to.</li>
       </ul>
     </div>
-    <div class="col after"><h4>After</h4><span class="colk">UNIT-02, shipped as v2</span>
+    <div class="col after"><h4>After</h4><span class="colk">UNIT-02, web-only</span>
       <ul>
-        <li><strong>One explicit identity</strong>: brutalist mono instrument panel, hard rules, square controls, JetBrains Mono, STANDBY/RUNNING lamp.</li>
-        <li><strong>Five real alternatives existed</strong>, so the pick is reviewable &mdash; not a vibe.</li>
-        <li>Correct 63&nbsp;Hz&ndash;8&nbsp;kHz octave bands, live dB with a neutral rule.</li>
-        <li>Shipped clean as a flat, web-only, installable PWA &mdash; and kept receiving real polish.</li>
+        <li>One explicit identity: brutalist mono instrument panel.</li>
+        <li>Five real alternatives existed, so the pick is reviewable.</li>
+        <li>Flat Next.js PWA, installed via &ldquo;save to home screen&rdquo;, offline.</li>
       </ul>
     </div>
   </div>
 </section>
 
-<!-- ============ 8 TAKEAWAYS ============ -->
-<section id="takeaways" class="reveal">
-  <h2>Takeaways<span class="lvl brief">the reusable lesson</span></h2>
-  <div class="take"><span class="n a">1&ensp;</span> <strong>A design problem needs a design method, not more effort.</strong> Five months of &ldquo;ui bumps&rdquo; never produced a settled look; one deliberate cast-and-pick day did. The constraint was method (show real alternatives, pick, refine), not hours.</div>
-  <div class="take"><span class="n a">2&ensp;</span> <strong>Cast, don&rsquo;t guess.</strong> The single highest-leverage move was producing five distinct, honest design families before committing. It turns &ldquo;is this good?&rdquo; into &ldquo;which of these, and why not the others?&rdquo;</div>
-  <div class="take"><span class="n a">3&ensp;</span> <strong>Taste can be built, not wished for.</strong> The agent&rsquo;s point of view came from a scraped-and-curated design corpus plus curated skills &mdash; including a deliberate do-not-install list. Curation beat accumulation.</div>
-  <div class="take"><span class="n a">4&ensp;</span> <strong>A good design agent ships state, not decoration.</strong> The refinement added STANDBY/RUNNING, live dB, correct band math, contrast fixes &mdash; meaning and correctness on top of a chosen aesthetic. Craft is the second half of taste.</div>
-  <div class="take"><span class="n a">5&ensp;</span> <strong>The agent&rsquo;s value compounds across the lifecycle.</strong> The same discipline that cast the variants kept paying off through stereo, marquee, a versioned service worker and a PWA install guide &mdash; the design language survived contact with real product work.</div>
+<!-- ============ 4 USED, NOT JUST SHIPPED ============ -->
+<section id="proof" class="reveal">
+  <h2>Used, not just shipped<span class="lvl brief">the part that makes it count</span></h2>
+  <p class="lede">A shipped thing you never touch is a hobby. A simple thing you reach for nightly is a product.</p>
+  <p>Here is the honest measure. I do not open this app to admire UNIT-02. I open it to sleep. Most nights I pick one preset, set the low-cut so it does not fatigue my ears, and go to bed with it playing. On YouTube, &ldquo;white noise for sleep&rdquo; playlists are harsh on the high end or boomy on the low end. Tuning it for real hardware is the difference: earbuds in bed, over-ears with bass when I am working. And because v2 is a PWA that works offline, it rides in my pocket for flights and crying babies.</p>
+  <div class="stat-strip reveal">
+    <div class="stat"><span class="n a">nightly</span><span class="k">how often I actually use it</span></div>
+    <div class="stat"><span class="n b">43</span><span class="k">commits of drift (v1, ~5 months)</span></div>
+    <div class="stat"><span class="n a">16</span><span class="k">commits, flat v2, from init to now</span></div>
+    <div class="stat"><span class="n a">1 day</span><span class="k">agent redesign day (five casts + a pick)</span></div>
+  </div>
+  <div class="pull">The constraint was never engineering. It was taste with an owner. Give the design to something that will cast, pick, and commit &mdash; and it ships.</div>
+
+  <h3>The control group: spectr, the thing I never used</h3>
+  <p>Right after UNIT-02 shipped, I started &ldquo;spectr.&rdquo; It was going to be an ambient sound-design engine, then a full DAW weaving modular eurorack elements with a digital one. It felt like the impressive next thing. It was a scope explosion, and I did not use it once.</p>
+  <div class="stat-strip reveal">
+    <div class="stat"><span class="n b">128</span><span class="k">commits in ~2 weeks (May 9&ndash;24)</span></div>
+    <div class="stat"><span class="n b">~128k</span><span class="k">LOC tracked at its peak</span></div>
+    <div class="stat"><span class="n b">real</span><span class="k">piano-roll polyphony, step sequencer, DSP hardening</span></div>
+    <div class="stat"><span class="n b">0</span><span class="k">times I opened it to actually make a sound</span></div>
+  </div>
+  <figure class="shot gif reveal">
+    <div class="imgframe"><img src="screens/charlie-conspiracy.gif" alt="Animated gif of Charlie Day's red-string conspiracy board"></div>
+    <figcaption>The scope creep, visualized: a DAW &ldquo;that weaves modular eurorack with digital&rdquo; was the red-string board I built and never used. The noise generator I shipped in a day, I use every night.</figcaption>
+  </figure>
+  <p>That asymmetry is the whole lesson. UNIT-02 took discipline and taste. spectr took hubris and a git history that looks great on paper. One of them changed how I sleep. The other is a cautionary tale I keep around to check myself.</p>
+  <p class="mono" style="font-size:13px;color:var(--ld-ink-faint)">Note: audio across web, mobile, and desktop is genuinely hard. Even Andrew Kelley, creator of Zig, has said he wrote a whole language partly because existing tools could not do the audio work he wanted. Choosing not to build a native DAW was not timid. It was reading the room.</p>
 </section>
 
-<!-- ============ 9 GROUNDING ============ -->
-<section id="grounding" class="reveal">
-  <h2>Grounding &amp; method<span class="lvl deep">how this postmortem was built</span></h2>
-  <p class="lede">Every claim here traces to a file, a commit, or a live capture &mdash; no screenshots were imagined.</p>
-  <p>The screenshots in this report are <strong>live captures</strong>, not mockups: the five <code>/var</code> concepts and the winner were rendered by the actual v1 dev server and screen-captured at a 1280&times;900 viewport; the v2 shots were captured from the v2 dev server at desktop and mobile (390&times;844) sizes. Variant identities (fonts, radii, fills) were verified against the running page, not assumed from filenames.</p>
-  <p>The narrative arc &mdash; PM-doc-first birth &rarr; mobile+web monorepo &rarr; UI drift &rarr; five-cast redesign &rarr; UNIT-02 winner &rarr; v2 spin-out &rarr; continued polish &mdash; is grounded in the v1 git history (<code>1af4d93</code> &rarr; <code>d4ddb88</code>) and the v2 commit log. The agent-lineage claims are grounded in the agent definitions themselves (<code>~/.omp/agent/agents/frontend-craft.md</code>, <code>ux-worker/CAPABILITIES.md</code>) and the seed repos the author cites from memory &mdash; <code>scrape-ig-saved-list</code>, <code>agent-knowledgebase</code> (whose UI/UX corpus the registry scan draws from), and <code>datalake</code>.</p>
+<!-- ============ 5 THE LESSON ============ -->
+<section id="lesson" class="reveal">
+  <h2>The lesson<span class="lvl brief">what I&rsquo;d do again, what I&rsquo;d cut</span></h2>
+  <p class="lede">If I started over tomorrow, these are the calls I would keep and the ones I would make sooner.</p>
+  <div class="take"><span class="n a">1&ensp;</span> <strong>Own the agent; do not rent it.</strong> Asking a generic helper to &ldquo;make an awesome UI&rdquo; is how I got v1&rsquo;s drift. The value came from an agent I sourced taste for, built, and matured &mdash; and kept improving. The judgment is mine; the agent is the tool.</div>
+  <div class="take"><span class="n a">2&ensp;</span> <strong>Cast, don&rsquo;t guess.</strong> Five honest alternatives turn &ldquo;is this good?&rdquo; into &ldquo;which of these, and why not the others?&rdquo; It is the one move that changed the outcome most.</div>
+  <div class="take"><span class="n a">3&ensp;</span> <strong>Simplification is a feature, not a failure.</strong> Ripping out the native app and shipping save-to-home-screen PWA reused what the platform already gives you. Fewer moving parts, more usage.</div>
+  <div class="take"><span class="n a">4&ensp;</span> <strong>Good beats perfect beats useful.</strong> A shipped preset I reach for nightly beats a perfect DAW I never open. If it does not get used, it does not count.</div>
+  <div class="take"><span class="n a">5&ensp;</span> <strong>If I started over:</strong> I would have run the cast-and-pick on day one instead of month five, killed the &ldquo;impressive&rdquo; DAW ambition in the first week, and let &ldquo;will I use this&rdquo; be the gate from the start instead of &ldquo;is this cool.&rdquo;</div>
 </section>
-
-<footer>
-  <p class="src">ambient-noise-app / ambient-noise-app-v2 &mdash; design-agent makeover postmortem &middot; 2026-09-05 &rarr; 09-06.</p>
-  <p>Primary sources: <code>ambient-noise-app</code> git log &amp; <code>repo/apps/web/src/app/var/**/page.tsx</code>; <code>ambient-noise-app-v2</code> README / LEARNINGS / commit log; agent defs <code>~/.omp/agent/agents/frontend-craft.md</code>, <code>~/.omp/agent/agents/ux-worker/CAPABILITIES.md</code>; seed repos <code>scrape-ig-saved-list</code>, <code>agent-knowledgebase</code>, <code>datalake</code>. Screens: live captures of v1 <code>/var</code> routes and v2, staged in <code>screens/</code> beside this file.</p>
-</footer>
 
 </main>
+
+<footer>
+  <p class="src">Primary sources &amp; grounding &mdash; nothing here is imagined:</p>
+  <p><code>ambient-noise-app</code> git log (<code>1af4d93</code> &rarr; <code>d4ddb88</code>) and <code>apps/web/src/app/var/**/page.tsx</code>; the pre-redesign player captured live from <strong>ambz.vercel.app</strong>; <code>ambient-noise-app-v2</code> commit log &amp; README; agent definitions <code>~/.omp/agent/agents/ux-worker/</code> and <code>frontend-craft</code>; seed repos <code>scrape-ig-saved-list</code> &rarr; <code>agent-knowledgebase</code> &rarr; <code>datalake</code>. spectr figures from its git history (128 commits, ~128k tracked LOC). Zig/audio remark is from an Andrew Kelley interview and cited as recollection. Screens are live captures staged in <code>screens/</code>.</p>
+  <p class="src">evan o&rsquo;keefe &middot; design-agent makeover &middot; 2026-09</p>
+</footer>
+
 <script>
 (function(){
   var root=document.documentElement;
