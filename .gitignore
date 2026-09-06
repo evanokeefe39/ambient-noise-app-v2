@@ -35,5 +35,8 @@ coverage/
 # Vercel
 .vercel
 
+# Generated (build writes stamped copy from sw.template.js)
+public/sw.js
+
 # TypeScript
 *.tsbuildinfo

@@ -1,9 +1,12 @@
 /**
  * Ambient Noise — Service Worker
- * Cache-first for worklets + static assets; network-first for everything else.
+ * Network-first for navigation/API; cache-first for hashed static assets.
+ * CACHE_NAME is bumped per release (build stamps CACHE_VERSION) so activation
+ * purges the previous cache and clients refetch changed files. A page that is
+ * already controlled detects the new worker, asks it to skipWaiting(), and the
+ * resulting controllerchange triggers a single reload to serve the fresh build.
  */
-
-const CACHE_NAME = 'ambient-v2';
+const CACHE_NAME = 'ambient-v2-__CACHE_VERSION__';
 
 // Core assets to precache at install time
 const PRECACHE_URLS = [
@@ -32,6 +35,12 @@ self.addEventListener('activate', (event) => {
     )
   );
   self.clients.claim();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
