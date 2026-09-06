@@ -6,8 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0608",
-  "theme_color": "#0a0608",
+  "background_color": "#181411",
+  "theme_color": "#181411",
   "orientation": "any",
   "categories": ["music", "utilities", "health"],
   "icons": [
