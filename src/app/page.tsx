@@ -642,7 +642,7 @@ export default function Var2ImprovedPage() {
                       freq: lowCutFreq,
                       setFreq: setLowCutFreq,
                       min: 20,
-                      max: 120,
+                      max: 200,
                       step: 1,
                       format: (hz: number) => `${hz} HZ`,
                     },
