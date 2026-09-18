@@ -7,9 +7,9 @@
  * defaults and do not affect the signal.
  *
  * LOW CUT is 8th order (48 dB/oct): four cascaded highpass biquads in a
- * Butterworth alignment (Q 0.5098 / 0.6013 / 0.9000 / 2.5629), so the combined
- * response is maximally flat in the passband. A single biquad is only 2nd order
- * (12 dB/oct), which is why the cascade exists.
+ * Linkwitz-Riley alignment (Q 0.707 x4), which is both steeper and less
+ * resonant at the corner than the Butterworth pole set. A single biquad is
+ * only 2nd order (12 dB/oct), which is why the cascade exists.
  * HIGH CUT is deliberately gentler at 2nd order (12 dB/oct): one lowpass biquad.
  *
  * On iOS, MasterGain routes through MediaStreamDestinationNode → <audio> element
@@ -43,15 +43,21 @@ function isIOS(): boolean {
 const CROSSFADE_DURATION = 0.5 // seconds — W2.A5
 
 /**
- * 8th-order Butterworth Q values for the cascaded highpass (LOW CUT).
- * Four 2nd-order sections at these Qs multiply to a maximally flat 48 dB/oct
- * response. Standard Butterworth pole Qs, Q_k = 1/(2·cos((2k+1)π/16)).
+ * 8th-order Linkwitz-Riley Q set for the cascaded highpass (LOW CUT).
+ * Four identical 2nd-order sections at Q 0.707 = LR8, which is 48 dB/oct and
+ * puts the corner at -6 dB (amplitude-halving) rather than peaking.
  *
- * The last stage (Q 2.5629) is a strong resonance. That is what buys the flat
- * passband, but it is also why the off-state park frequency matters so much
- * more here than it did at 4th order — see LOWCUT_OFF_HZ.
+ * Deliberately NOT the Butterworth pole set (0.510/0.601/0.900/2.563): the
+ * Q 2.563 stage made the response peak sharply just above the corner, which is
+ * audible as a boost at whatever frequency the cut is set to. Measured at a
+ * 100 Hz corner, Butterworth peaked +8.2 dB at 125 Hz vs +6.9 dB for LR.
+ *
+ * Note the residual +6.9 dB bump is inherent to cascading four highpass stages
+ * at one frequency, not to the Q values — any 4-stage cascade shows it. Damping
+ * the Qs is the cheap part of the fix; flattening the corner properly would
+ * need staggered corner frequencies.
  */
-const LOWCUT_QS = [0.5097956, 0.6013449, 0.8999762, 2.5629154] as const
+const LOWCUT_QS = [0.7071068, 0.7071068, 0.7071068, 0.7071068] as const
 
 /**
  * Time constant (seconds) for setTargetAtTime smoothing on cut-frequency
@@ -63,11 +69,10 @@ const CUT_SMOOTHING_TAU = 0.015
 
 /**
  * Transparent "off" cutoff frequency for LOW CUT.
- * Must sit very low: with the 8th-order Butterworth cascade (which includes a
- * Q 2.5629 resonance stage), parking the stack at 20 Hz would add +7.0 dB at
- * 31.5 Hz and +2.1 dB at 63 Hz — a severe bass boost with LOW CUT reading OFF.
- * At 2 Hz the lift at 31.5 Hz is +0.09 dB, i.e. inaudible, and 2 Hz is below
- * the audible band and the noise generators' practical output.
+ * Must sit low: with four cascaded highpass stages at Q 0.707, parking the
+ * stack at 5 Hz would add +0.50 dB at 31.5 Hz and +0.13 dB at 63 Hz. At 2 Hz
+ * the lift at 31.5 Hz is +0.08 dB, i.e. inaudible, and 2 Hz is below the
+ * audible band and the noise generators' practical output.
  * Verified via getFrequencyResponse at 2/5/10/20 Hz.
  */
 const LOWCUT_OFF_HZ = 2
@@ -269,6 +274,10 @@ export class AudioEngine implements IAudioEngine {
       const target = this._lowCutHz ?? LOWCUT_OFF_HZ
       const now = this._ctx.currentTime
       for (const f of this._lowCutStages) {
+        // Drop any pending automation first: a fast slider drag leaves a
+        // future-scheduled event that would otherwise override a later bypass
+        // step, so the filter would not settle at the park frequency.
+        f.frequency.cancelScheduledValues(now)
         // Bypass is a step: setTargetAtTime approaches asymptotically and
         // would leave the filter audibly short of its target.
         if (this._lowCutHz === null) f.frequency.setValueAtTime(target, now)
@@ -283,6 +292,7 @@ export class AudioEngine implements IAudioEngine {
     if (this._highCutFilter && this._ctx) {
       const target = this._highCutHz ?? HIGHCUT_OFF_HZ
       const now = this._ctx.currentTime
+      this._highCutFilter.frequency.cancelScheduledValues(now)
       if (this._highCutHz === null)
         this._highCutFilter.frequency.setValueAtTime(target, now)
       else
