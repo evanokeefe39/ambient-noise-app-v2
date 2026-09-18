@@ -1,9 +1,16 @@
 /**
  * AudioEngine — implements IAudioEngine from @ambient/shared.
  * Manages the full Web Audio API graph:
- *   [NoiseSource] → [CrossfadeGain] → [LowCut hp] → [HighCut lp] → [EQChain] → [HeadphoneEQ] → [MasterGain] → [Destination]
- * The LowCut (highpass) and HighCut (lowpass) filters are optional: when off
- * they sit at transparent defaults (20 Hz / 20 kHz) and do not affect the signal.
+ *   [NoiseSource] → [CrossfadeGain] → [LowCut hp1] → [LowCut hp2] → [HighCut lp]
+ *     → [EQChain] → [HeadphoneEQ] → [MasterGain] → [Destination]
+ * The LowCut and HighCut filters are optional: when off they sit at transparent
+ * defaults (20 Hz / 20 kHz) and do not affect the signal.
+ *
+ * LOW CUT is 4th order (24 dB/oct): two cascaded highpass biquads in a
+ * Butterworth alignment (Q 0.5412 / 1.3065), so the combined response is
+ * maximally flat with no resonant bump at the corner. A single biquad is only
+ * 2nd order (12 dB/oct), which is why the cascade exists.
+ * HIGH CUT is deliberately gentler at 2nd order (12 dB/oct): one lowpass biquad.
  *
  * On iOS, MasterGain routes through MediaStreamDestinationNode → <audio> element
  * instead of audioContext.destination, because iOS suspends Web Audio API when
@@ -34,6 +41,34 @@ function isIOS(): boolean {
 }
 
 const CROSSFADE_DURATION = 0.5 // seconds — W2.A5
+
+/**
+ * 4th-order Butterworth Q pair for a cascaded highpass (LOW CUT).
+ * Two 2nd-order sections at these Q values multiply to a maximally flat
+ * 24 dB/oct response. Using two identical Q 0.707 stages instead would peak
+ * ~1 dB at the corner — audible as a resonant emphasis on noise.
+ * Values are the standard Butterworth pole Qs: 1/(2·cos(3π/8)) and 1/(2·cos(π/8)).
+ */
+const LOWCUT_Q_STAGE_1 = 0.541196100146197
+const LOWCUT_Q_STAGE_2 = 1.306562964876377
+
+/**
+ * Time constant (seconds) for setTargetAtTime smoothing on cut-frequency
+ * sweeps. Dragging the cutoff slider updates ~60×/s; without smoothing each
+ * update is a step that zippers. ~15 ms settles faster than the ear resolves
+ * but slow enough to remove the staircase.
+ */
+const CUT_SMOOTHING_TAU = 0.015
+
+/**
+ * Transparent "off" cutoff frequencies. LOW CUT must sit well below 20 Hz:
+ * with the 4th-order Butterworth cascade, parking the pair at 20 Hz would add
+ * +1.0 dB at 63 Hz and +3.3 dB at 31.5 Hz — an audible bass lift with LOW CUT
+ * reading OFF (the Butterworth Q overshoots before it rolls off). At 5 Hz the
+ * lift at 63 Hz is +0.065 dB, i.e. inaudible. Verified via getFrequencyResponse.
+ */
+const LOWCUT_OFF_HZ = 5
+const HIGHCUT_OFF_HZ = 20000
 const WORKLET_PATHS: Record<NoiseColor, string> = {
   white: '/worklets/white-noise-processor.js',
   pink: '/worklets/pink-noise-processor.js',
@@ -54,6 +89,7 @@ export class AudioEngine implements IAudioEngine {
   private _eqChain: EQChain | null = null
   private _headphoneChain: EQChain | null = null
   private _lowCutFilter: BiquadFilterNode | null = null
+  private _lowCutFilter2: BiquadFilterNode | null = null
   private _highCutFilter: BiquadFilterNode | null = null
   private _lowCutHz: number | null = null
   private _highCutHz: number | null = null
@@ -95,16 +131,24 @@ export class AudioEngine implements IAudioEngine {
     this._headphoneChain = createEQChain(this._ctx)
     this._headphoneChain.reset() // ensure flat (0 dB gain on all bands)
 
-    // Optional cut filters (transparent when off): Crossfade → LowCut → HighCut → EQ
+    // Optional cut filters (transparent when off): Crossfade → LowCut(×2) → HighCut → EQ
+    // LOW CUT is two cascaded highpass biquads (4th order, 24 dB/oct) in a
+    // Butterworth alignment — the Q pair makes the combined response flat.
     this._lowCutFilter = this._ctx.createBiquadFilter()
     this._lowCutFilter.type = 'highpass'
-    this._lowCutFilter.frequency.value = 20
-    this._lowCutFilter.Q.value = 0.707
+    this._lowCutFilter.frequency.value = LOWCUT_OFF_HZ
+    this._lowCutFilter.Q.value = LOWCUT_Q_STAGE_1
+    this._lowCutFilter2 = this._ctx.createBiquadFilter()
+    this._lowCutFilter2.type = 'highpass'
+    this._lowCutFilter2.frequency.value = LOWCUT_OFF_HZ
+    this._lowCutFilter2.Q.value = LOWCUT_Q_STAGE_2
+    // HIGH CUT stays 2nd order (12 dB/oct) — intentionally gentler than LOW CUT.
     this._highCutFilter = this._ctx.createBiquadFilter()
     this._highCutFilter.type = 'lowpass'
-    this._highCutFilter.frequency.value = 20000
+    this._highCutFilter.frequency.value = HIGHCUT_OFF_HZ
     this._highCutFilter.Q.value = 0.707
-    this._lowCutFilter.connect(this._highCutFilter)
+    this._lowCutFilter.connect(this._lowCutFilter2)
+    this._lowCutFilter2.connect(this._highCutFilter)
     this._highCutFilter.connect(this._eqChain.input)
     this._eqChain.output.connect(this._headphoneChain.input)
     this._headphoneChain.output.connect(this._masterGain)
@@ -180,6 +224,7 @@ export class AudioEngine implements IAudioEngine {
     }
     this._masterGain?.disconnect()
     this._lowCutFilter?.disconnect()
+    this._lowCutFilter2?.disconnect()
     this._highCutFilter?.disconnect()
     if (this._iosAudioEl) {
       this._iosAudioEl.pause()
@@ -193,6 +238,7 @@ export class AudioEngine implements IAudioEngine {
     this._eqChain = null
     this._headphoneChain = null
     this._lowCutFilter = null
+    this._lowCutFilter2 = null
     this._highCutFilter = null
     this._sourceNodes = {}
     this._crossfadeGains = {}
@@ -211,12 +257,22 @@ export class AudioEngine implements IAudioEngine {
 
   // ── Cut filters ──────────────────────────────────────────────────────────
 
-  /** Enable/disable low cut (highpass). hz cutoff or null to bypass. */
+  /**
+   * Enable/disable low cut (highpass). hz cutoff or null to bypass.
+   * Both cascade stages are driven together; the 4th-order Butterworth pair
+   * only holds if they share a frequency.
+   */
   setLowCut(hz: number | null): void {
     this._lowCutHz = hz !== null && hz > 0 ? hz : null
-    if (this._lowCutFilter && this._ctx) {
-      const target = this._lowCutHz ?? 20
-      this._lowCutFilter.frequency.setValueAtTime(target, this._ctx.currentTime)
+    if (this._lowCutFilter && this._lowCutFilter2 && this._ctx) {
+      const target = this._lowCutHz ?? LOWCUT_OFF_HZ
+      const now = this._ctx.currentTime
+      for (const f of [this._lowCutFilter, this._lowCutFilter2]) {
+        // Bypass is a step: setTargetAtTime approaches asymptotically and
+        // would leave the filter audibly short of its target.
+        if (this._lowCutHz === null) f.frequency.setValueAtTime(target, now)
+        else f.frequency.setTargetAtTime(target, now, CUT_SMOOTHING_TAU)
+      }
     }
   }
 
@@ -224,11 +280,16 @@ export class AudioEngine implements IAudioEngine {
   setHighCut(hz: number | null): void {
     this._highCutHz = hz !== null && hz > 0 ? hz : null
     if (this._highCutFilter && this._ctx) {
-      const target = this._highCutHz ?? 20000
-      this._highCutFilter.frequency.setValueAtTime(
-        target,
-        this._ctx.currentTime,
-      )
+      const target = this._highCutHz ?? HIGHCUT_OFF_HZ
+      const now = this._ctx.currentTime
+      if (this._highCutHz === null)
+        this._highCutFilter.frequency.setValueAtTime(target, now)
+      else
+        this._highCutFilter.frequency.setTargetAtTime(
+          target,
+          now,
+          CUT_SMOOTHING_TAU,
+        )
     }
   }
 
