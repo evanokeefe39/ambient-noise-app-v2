@@ -139,7 +139,13 @@ export class AudioEngine implements IAudioEngine {
   private _headphoneChain: EQChain | null = null
   private _lowCutStages: BiquadFilterNode[] = []
   private _lowCutShaper: BiquadFilterNode | null = null
+  private _lowCutIn: GainNode | null = null
+  private _lowCutWet: GainNode | null = null
+  private _lowCutDry: GainNode | null = null
   private _highCutFilter: BiquadFilterNode | null = null
+  private _highCutIn: GainNode | null = null
+  private _highCutWet: GainNode | null = null
+  private _highCutDry: GainNode | null = null
   private _lowCutHz: number | null = null
   private _highCutHz: number | null = null
   private _stereo = true
@@ -180,10 +186,20 @@ export class AudioEngine implements IAudioEngine {
     this._headphoneChain = createEQChain(this._ctx)
     this._headphoneChain.reset() // ensure flat (0 dB gain on all bands)
 
-    // Optional cut filters (transparent when off): Crossfade → LowCut(×4) → shaper → HighCut → EQ
-    // LOW CUT is four cascaded highpass biquads (8th order, 48 dB/oct) at
-    // Q 0.707 (Linkwitz-Riley), followed by a peaking cut that cancels the
-    // cascade's ~+7 dB corner overshoot. See LOWCUT_SHAPE_* above.
+    // Optional cut filters. Each cut is a DRY/WET pair: the filter sits on the
+    // wet path and its dry counterpart runs unfiltered alongside. Bypass cross-
+    // fades the two gains instead of moving filter coefficients under live
+    // signal, so no frequency ever slews (which warbles) and no transfer
+    // function ever steps (which clicks).
+    //
+    //   xfadeGains ─┬─> lcWet -> [LowCut×4] -> shaper ─┬─> lcSum
+    //               └─> lcDry ─────────────────────────┘
+    //   lcSum ─┬─> hcWet -> [HighCut] ─┬─> hcSum -> EQ
+    //          └─> hcDry ──────────────┘
+    //
+    // LOW CUT wet path: four cascaded highpass biquads (8th order, 48 dB/oct) at
+    // Q 0.707 (Linkwitz-Riley), then a peaking cut cancelling the cascade's
+    // ~+7 dB corner overshoot. See LOWCUT_SHAPE_* above.
     this._lowCutStages = LOWCUT_QS.map((q) => {
       const f = this._ctx!.createBiquadFilter()
       f.type = 'highpass'
@@ -194,20 +210,45 @@ export class AudioEngine implements IAudioEngine {
     for (let i = 0; i < this._lowCutStages.length - 1; i++) {
       this._lowCutStages[i].connect(this._lowCutStages[i + 1])
     }
-    // Shaper parks at unity gain (gain 0 dB) while LOW CUT is off.
     this._lowCutShaper = this._ctx.createBiquadFilter()
     this._lowCutShaper.type = 'peaking'
     this._lowCutShaper.frequency.value = LOWCUT_OFF_HZ * LOWCUT_SHAPE_RATIO
     this._lowCutShaper.Q.value = LOWCUT_SHAPE_Q
-    this._lowCutShaper.gain.value = 0
+    this._lowCutShaper.gain.value = LOWCUT_SHAPE_GAIN_DB
+    this._lowCutStages[this._lowCutStages.length - 1].connect(this._lowCutShaper)
+
+    // LOW CUT dry/wet pair. Starts OFF => dry open, wet closed.
+    // The sum node feeds the next stage; each leg is fed from its own bus.
+    this._lowCutIn = this._ctx.createGain()
+    this._lowCutWet = this._ctx.createGain()
+    this._lowCutWet.gain.value = 0
+    this._lowCutDry = this._ctx.createGain()
+    this._lowCutDry.gain.value = 1
+    this._lowCutIn.connect(this._lowCutStages[0])
+    this._lowCutIn.connect(this._lowCutDry)
+    this._lowCutShaper.connect(this._lowCutWet)
+
     // HIGH CUT stays 2nd order (12 dB/oct) — intentionally gentler than LOW CUT.
     this._highCutFilter = this._ctx.createBiquadFilter()
     this._highCutFilter.type = 'lowpass'
     this._highCutFilter.frequency.value = HIGHCUT_OFF_HZ
     this._highCutFilter.Q.value = 0.707
-    this._lowCutStages[this._lowCutStages.length - 1].connect(this._lowCutShaper)
-    this._lowCutShaper.connect(this._highCutFilter)
-    this._highCutFilter.connect(this._eqChain.input)
+
+    // HIGH CUT dry/wet pair. Starts ON (default preset has high cut on).
+    this._highCutIn = this._ctx.createGain()
+    this._highCutWet = this._ctx.createGain()
+    this._highCutWet.gain.value = 1
+    this._highCutDry = this._ctx.createGain()
+    this._highCutDry.gain.value = 0
+    this._highCutIn.connect(this._highCutFilter)
+    this._highCutIn.connect(this._highCutDry)
+    this._highCutFilter.connect(this._highCutWet)
+
+    // LOW CUT sum (both legs) feeds the HIGH CUT input bus; HIGH CUT sum feeds EQ.
+    this._lowCutWet.connect(this._highCutIn)
+    this._lowCutDry.connect(this._highCutIn)
+    this._highCutWet.connect(this._eqChain.input)
+    this._highCutDry.connect(this._eqChain.input)
     this._eqChain.output.connect(this._headphoneChain.input)
     this._headphoneChain.output.connect(this._masterGain)
 
@@ -246,7 +287,7 @@ export class AudioEngine implements IAudioEngine {
     for (const color of ['white', 'pink', 'brown'] as NoiseColor[]) {
       const gain = this._ctx.createGain()
       gain.gain.value = 0
-      gain.connect(this._lowCutStages[0])
+      gain.connect(this._lowCutIn!)
       this._crossfadeGains[color] = gain
     }
 
@@ -283,7 +324,13 @@ export class AudioEngine implements IAudioEngine {
     this._masterGain?.disconnect()
     this._lowCutStages.forEach((n) => n.disconnect())
     this._lowCutShaper?.disconnect()
+    this._lowCutIn?.disconnect()
+    this._lowCutWet?.disconnect()
+    this._lowCutDry?.disconnect()
     this._highCutFilter?.disconnect()
+    this._highCutIn?.disconnect()
+    this._highCutWet?.disconnect()
+    this._highCutDry?.disconnect()
     if (this._iosAudioEl) {
       this._iosAudioEl.pause()
       this._iosAudioEl.srcObject = null
@@ -297,7 +344,13 @@ export class AudioEngine implements IAudioEngine {
     this._headphoneChain = null
     this._lowCutStages = []
     this._lowCutShaper = null
+    this._lowCutIn = null
+    this._lowCutWet = null
+    this._lowCutDry = null
     this._highCutFilter = null
+    this._highCutIn = null
+    this._highCutWet = null
+    this._highCutDry = null
     this._sourceNodes = {}
     this._crossfadeGains = {}
   }
@@ -324,38 +377,36 @@ export class AudioEngine implements IAudioEngine {
   setLowCut(hz: number | null): void {
     this._lowCutHz = hz !== null && hz > 0 ? hz : null
     if (this._lowCutStages.length && this._lowCutShaper && this._ctx) {
-      const target = this._lowCutHz ?? LOWCUT_OFF_HZ
       const now = this._ctx.currentTime
       const bypassed = this._lowCutHz === null
-      for (const f of this._lowCutStages) {
-        // Clear any pending trajectory so it cannot keep pulling the param
-        // toward a previous target.
-        f.frequency.cancelScheduledValues(now)
-        // Always ramp, never step. A stepped frequency change is a step in the
-        // filter's transfer function, which clicks through live signal — worst
-        // on bypass, where the frequency crosses the region of peak gain. Hold
-        // the current value then ramp (same idiom as the noise crossfade).
-        f.frequency.setValueAtTime(f.frequency.value, now)
-        f.frequency.linearRampToValueAtTime(
-          target,
-          now + (bypassed ? CUT_RAMP_TAU : CUT_SMOOTHING_TAU),
-        )
+      if (!bypassed) {
+        // Frequency changes only when the user actually moves the cutoff, and
+        // it is set while the wet path is CLOSED (or just about to open), never
+        // ramped while audible — a 48 dB/oct cascade slewing under live signal
+        // warps and stutters. That was the toggle artifact.
+        const target = this._lowCutHz!
+        const engaged = this._lowCutWet ? this._lowCutWet.gain.value > 0 : false
+        for (const f of this._lowCutStages) {
+          f.frequency.cancelScheduledValues(now)
+          if (engaged) {
+            // Already audible: ease to the new corner so a drag does not zipper.
+            f.frequency.setValueAtTime(f.frequency.value, now)
+            f.frequency.linearRampToValueAtTime(target, now + CUT_SMOOTHING_TAU)
+          } else {
+            // Wet path silent: jump instantly, nothing is audible to sweep.
+            f.frequency.setValueAtTime(target, now)
+          }
+        }
+        this._lowCutShaper.frequency.cancelScheduledValues(now)
+        this._lowCutShaper.frequency.setValueAtTime(target * LOWCUT_SHAPE_RATIO, now)
       }
-      // Shaper: tracks the corner by ratio, unity gain when bypassed.
-      this._lowCutShaper.frequency.cancelScheduledValues(now)
-      this._lowCutShaper.gain.cancelScheduledValues(now)
-      this._lowCutShaper.frequency.setValueAtTime(
-        this._lowCutShaper.frequency.value,
+      // Bypass is a pure gain crossfade between the filtered and unfiltered
+      // legs. No filter coefficient moves, so there is no slew and no step.
+      this._crossfadeGains_(
+        this._lowCutWet,
+        this._lowCutDry,
+        bypassed ? 0 : 1,
         now,
-      )
-      this._lowCutShaper.gain.setValueAtTime(this._lowCutShaper.gain.value, now)
-      this._lowCutShaper.frequency.linearRampToValueAtTime(
-        target * LOWCUT_SHAPE_RATIO,
-        now + (bypassed ? CUT_RAMP_TAU : CUT_SMOOTHING_TAU),
-      )
-      this._lowCutShaper.gain.linearRampToValueAtTime(
-        bypassed ? 0 : LOWCUT_SHAPE_GAIN_DB,
-        now + (bypassed ? CUT_RAMP_TAU : CUT_SMOOTHING_TAU),
       )
     }
   }
@@ -364,21 +415,54 @@ export class AudioEngine implements IAudioEngine {
   setHighCut(hz: number | null): void {
     this._highCutHz = hz !== null && hz > 0 ? hz : null
     if (this._highCutFilter && this._ctx) {
-      const target = this._highCutHz ?? HIGHCUT_OFF_HZ
       const now = this._ctx.currentTime
       const bypassed = this._highCutHz === null
-      this._highCutFilter.frequency.cancelScheduledValues(now)
-      // Ramp, never step — see CUT_RAMP_TAU. This path had the largest measured
-      // discontinuity of the two (2.1x baseline on a 3 kHz tone).
-      this._highCutFilter.frequency.setValueAtTime(
-        this._highCutFilter.frequency.value,
+      if (!bypassed) {
+        const target = this._highCutHz!
+        const engaged = this._highCutWet ? this._highCutWet.gain.value > 0 : false
+        this._highCutFilter.frequency.cancelScheduledValues(now)
+        if (engaged) {
+          this._highCutFilter.frequency.setValueAtTime(
+            this._highCutFilter.frequency.value,
+            now,
+          )
+          this._highCutFilter.frequency.linearRampToValueAtTime(
+            target,
+            now + CUT_SMOOTHING_TAU,
+          )
+        } else {
+          // Wet path silent — jump, nothing audible to sweep.
+          this._highCutFilter.frequency.setValueAtTime(target, now)
+        }
+      }
+      this._crossfadeGains_(
+        this._highCutWet,
+        this._highCutDry,
+        bypassed ? 0 : 1,
         now,
       )
-      this._highCutFilter.frequency.linearRampToValueAtTime(
-        target,
-        now + (bypassed ? CUT_RAMP_TAU : CUT_SMOOTHING_TAU),
-      )
     }
+  }
+
+  /**
+   * Equal-weight dry/wet crossfade used by the cut-filter bypass.
+   * Ramps `wet` toward `wetTarget` and `dry` to its complement over
+   * CUT_RAMP_TAU. Gain is the only thing that moves, so the transition is
+   * continuous in the signal domain regardless of filter topology.
+   */
+  private _crossfadeGains_(
+    wet: GainNode | null,
+    dry: GainNode | null,
+    wetTarget: number,
+    now: number,
+  ): void {
+    if (!wet || !dry) return
+    wet.gain.cancelScheduledValues(now)
+    dry.gain.cancelScheduledValues(now)
+    wet.gain.setValueAtTime(wet.gain.value, now)
+    dry.gain.setValueAtTime(dry.gain.value, now)
+    wet.gain.linearRampToValueAtTime(wetTarget, now + CUT_RAMP_TAU)
+    dry.gain.linearRampToValueAtTime(1 - wetTarget, now + CUT_RAMP_TAU)
   }
 
   // ── Stereo / mono ─────────────────────────────────────────────────────────
