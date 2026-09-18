@@ -157,6 +157,13 @@ export class AudioEngine implements IAudioEngine {
    */
   private _lowCutEngaged = false
   private _highCutEngaged = true
+  /**
+   * In-flight bypass ramp endpoints per cut: {from, start, to}. Lets a
+   * re-entrant toggle resume from the ramp's true position instead of reading
+   * `gain.value`, which reports only the last scheduled value.
+   */
+  private _cutRamp: Record<'low' | 'high', { from: number; start: number; to: number } | null> =
+    { low: null, high: null }
   private _stereo = true
 
   // One source node + crossfade gain node per noise color
@@ -360,6 +367,7 @@ export class AudioEngine implements IAudioEngine {
     this._highCutIn = null
     this._highCutWet = null
     this._highCutDry = null
+    this._cutRamp = { low: null, high: null }
     this._sourceNodes = {}
     this._crossfadeGains = {}
   }
@@ -417,6 +425,7 @@ export class AudioEngine implements IAudioEngine {
         this._lowCutDry,
         bypassed ? 0 : 1,
         now,
+        'low',
       )
     }
   }
@@ -451,6 +460,7 @@ export class AudioEngine implements IAudioEngine {
         this._highCutDry,
         bypassed ? 0 : 1,
         now,
+        'high',
       )
     }
   }
@@ -466,20 +476,46 @@ export class AudioEngine implements IAudioEngine {
    * a linear crossfade gives 0.9955x (a 0.04 dB dip, inaudible) while
    * equal-power gives 1.4079x (a +3 dB bump). Equal-power is for uncorrelated
    * sources and would make every toggle audibly louder in the middle.
+   *
+   * Re-entrancy: two toggles inside CUT_RAMP_TAU must not snap the gain. The
+   * starting gain is computed from the in-flight ramp (start gain, start time,
+   * target) rather than read from `gain.value`, which reports the last
+   * *scheduled* value and would floor the ramp at a stale endpoint — leaving
+   * wet+dry != 1 and dipping the level. Holding the endpoints also guarantees
+   * the complement holds exactly at every instant of a re-started ramp.
    */
   private _rampCutBypass(
     wet: GainNode | null,
     dry: GainNode | null,
     wetTarget: number,
     now: number,
+    state: 'low' | 'high',
   ): void {
     if (!wet || !dry) return
+    const from = this._cutRampState(wet, now, state)
     wet.gain.cancelScheduledValues(now)
     dry.gain.cancelScheduledValues(now)
-    wet.gain.setValueAtTime(wet.gain.value, now)
-    dry.gain.setValueAtTime(dry.gain.value, now)
+    // Both legs start from the complement pair, so wet + dry === 1 throughout.
+    wet.gain.setValueAtTime(from, now)
+    dry.gain.setValueAtTime(1 - from, now)
     wet.gain.linearRampToValueAtTime(wetTarget, now + CUT_RAMP_TAU)
     dry.gain.linearRampToValueAtTime(1 - wetTarget, now + CUT_RAMP_TAU)
+    this._cutRamp[state] = { from, start: now, to: wetTarget }
+  }
+
+  /**
+   * Current wet gain for a cut, accounting for an in-flight ramp.
+   * Returns the analytic position of the linear ramp if one is running,
+   * otherwise the settled target. Avoids reading `gain.value`, which reports
+   * the last scheduled value rather than the value mid-ramp.
+   */
+  private _cutRampState(wet: GainNode, now: number, state: 'low' | 'high'): number {
+    const prev = this._cutRamp[state]
+    if (!prev) return wet.gain.value
+    const elapsed = now - prev.start
+    if (elapsed >= CUT_RAMP_TAU) return prev.to // ramp finished
+    const t = Math.max(0, elapsed) / CUT_RAMP_TAU
+    return prev.from + (prev.to - prev.from) * t
   }
 
   // ── Stereo / mono ─────────────────────────────────────────────────────────
