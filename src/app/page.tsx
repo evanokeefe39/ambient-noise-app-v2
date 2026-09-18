@@ -367,14 +367,38 @@ export default function Var2ImprovedPage() {
           <span className="flex items-center gap-3">
             <button
               onClick={() => toggleStereo(!stereo)}
-              aria-label="Toggle stereo mode"
+              title={stereo ? 'Stereo' : 'Mono'}
+              aria-label={`Toggle stereo mode, currently ${stereo ? 'stereo' : 'mono'}`}
               aria-pressed={stereo}
-              className={`w-14 border px-1.5 py-0.5 text-center text-[10px] uppercase tracking-widest transition-colors md:text-[11px] ${
+              className={`flex h-6 items-center gap-1.5 border px-2 transition-colors ${
                 stereo
                   ? 'border-border text-foreground'
                   : 'border-border text-foreground-muted hover:text-foreground'
               }`}
             >
+              {/* Channel-format glyph: two overlapping circles = stereo, one = mono.
+                  Audio-industry convention (Logic/Cubase/Focusrite), drawn by hand.
+                  Fixed-size slot (viewBox 24x14, r3.5 at cx 8/16 = 3u clear gap) so the
+                  word and the RUNNING lamp never shift when the state toggles. */}
+              <svg
+                viewBox="0 0 24 14"
+                width="16"
+                height="10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                aria-hidden="true"
+                className="shrink-0"
+              >
+                {stereo ? (
+                  <>
+                    <circle cx="8" cy="7" r="3.5" />
+                    <circle cx="16" cy="7" r="3.5" />
+                  </>
+                ) : (
+                  <circle cx="12" cy="7" r="3.5" />
+                )}
+              </svg>
               {stereo ? 'STEREO' : 'MONO'}
             </button>
             <span className="flex items-center gap-2">
