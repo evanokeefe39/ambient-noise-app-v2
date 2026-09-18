@@ -70,11 +70,18 @@ const LOWCUT_QS = [0.7071068, 0.7071068, 0.7071068, 0.7071068] as const
  * Four cascaded highpass stages overshoot ~+7 dB just above the corner. A
  * peaking CUT placed at LOWCUT_SHAPE_RATIO x the corner removes it.
  *
+ * These three constants are derived from the LOWCUT_QS cascade above. Changing
+ * LOWCUT_QS (order, or Q values) invalidates them: the overshoot shape is a
+ * property of that cascade, so re-measure and retune if the Q set changes.
+ *
  * Measured across corners of 25/30/35/40/60/100/200 Hz, the result is identical
  * at every corner, so the shape is a property of the cascade and scales:
  *   raw peak        +6.98 dB at 1.33 x corner
  *   shaped peak     +1.05 dB
  *   low-end reject  -43.7 dB -> -44.7 dB (48 dB/oct preserved)
+ *   far passband    +0.06 dB, unchanged (5x+ the corner), so LOW CUT ON is
+ *                   level-matched to OFF and the curve stays monotonic — the
+ *                   cut flattens the bump rather than digging a hole.
  * Applied only while LOW CUT is on; the shaper parks at unity gain otherwise.
  */
 const LOWCUT_SHAPE_RATIO = 1.36
