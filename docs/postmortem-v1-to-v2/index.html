@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I spent 5 months nudging a UI. Then I built the agent that finished it in a day.</title>
+<meta name="description" content="How ambient-noise went from a working player whose look drifted for five months of 'ui bump' commits to a cleaner, web-only instrument shipped in one day by a design agent I built and matured from scraped Instagram design posts. The proof it worked is not a mockup: it gets used, every night.">
+<!-- Design system: dev-portfolio-2 /landing (skin F — cool type-led terminal).
+     Token source: components/landing/tokens.css. Body/data faces are the portfolio's
+     own Google fonts (IBM Plex Sans/Mono); the portfolio's local DOS faces
+     (ModernDOS/PixelOperator) are substituted with the Google-hosted terminal
+     face VT323 for display, since this file ships standalone. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* dev-portfolio-2 token layer (skin F defaults) */
+  --ld-bg:#f6f8fa;
+  --ld-ink:#1c2733;
+  --ld-ink-soft:#45525e;
+  --ld-ink-faint:#8a97a3;
+  --ld-accent:#0e7490;         /* AFTER — coherent, crafted, shipped (portfolio accent) */
+  --ld-rule:#dde4ea;
+  --ld-card-bg:#eef2f6;
+  --ld-card-border:#d4dce3;
+  --ld-btn-bg:#1c2733;
+  --ld-btn-ink:#22d3ee;
+  --ld-cat-amber:#b45309;      /* BEFORE — generic, manual, drifting (portfolio category amber) */
+  --ld-cat-amber-soft:#f4ece2;
+  --ld-diff-del:#b91c1c;
+  --ld-dark:#1c2733;
+  --ld-dark-ink:#dfe5ea;
+  /* type register: display = terminal face (uppercase), body = IBM Plex Sans, data = IBM Plex Mono */
+  --display:"VT323",var(--mono),monospace;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{font-family:var(--body);background:var(--ld-bg);color:var(--ld-ink);font-size:16.5px;line-height:1.65;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:no-preference){html.js .reveal:not(.in){opacity:0;transform:translateY(14px)}html.js .reveal{transition:opacity .7s ease,transform .7s ease}html.js .reveal.in{opacity:1;transform:none}}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.prose{max-width:68ch}
+a{color:var(--ld-accent);text-underline-offset:3px}
+code,.mono{font-family:var(--mono);font-size:.82em;background:var(--ld-card-bg);border:1px solid var(--ld-card-border);border-radius:2px;padding:.1em .35em;overflow-wrap:anywhere}
+strong{font-weight:600}
+@media(max-width:720px){table{display:block;overflow-x:auto;font-size:13px}nav.toc a{padding:12px 10px}}
+
+/* masthead — typed command line register */
+.masthead{border-bottom:1px solid var(--ld-rule);padding:16px 0;background:var(--ld-bg);position:relative;z-index:5}
+.masthead .wrap{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ld-ink-faint)}
+.kicker a{color:inherit;text-decoration:none}
+.kicker a:hover{color:var(--ld-accent)}
+
+/* sticky nav */
+nav.toc{position:sticky;top:0;z-index:40;background:rgba(246,248,250,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--ld-rule)}
+nav.toc .wrap{display:flex;gap:4px;overflow-x:auto;padding:0 24px;scrollbar-width:none}
+nav.toc .wrap::-webkit-scrollbar{display:none}
+nav.toc a{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--ld-ink-faint);text-decoration:none;padding:12px 12px;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s,border-color .2s}
+nav.toc a:hover{color:var(--ld-ink)}
+nav.toc a.active{color:var(--ld-ink);border-bottom-color:var(--ld-accent)}
+
+/* hero */
+header.hero{padding:56px 0 30px}
+.hero h1{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:clamp(2.1rem,4.9vw,3.6rem);line-height:1.06;letter-spacing:.01em;max-width:24ch}
+.hero h1 .after{color:var(--ld-accent)}
+.hero h1 .before{color:var(--ld-cat-amber)}
+.hero .dek{font-family:var(--body);font-size:clamp(1.05rem,1.8vw,1.2rem);line-height:1.6;color:var(--ld-ink-soft);max-width:64ch;margin-top:20px}
+.byline{margin-top:24px;font-family:var(--mono);font-size:12px;letter-spacing:.03em;color:var(--ld-ink-faint);display:flex;gap:18px;flex-wrap:wrap}
+.legend{display:flex;gap:26px;flex-wrap:wrap;margin-top:26px;font-family:var(--mono);font-size:12.5px;color:var(--ld-ink-soft)}
+.legend .key{display:inline-flex;align-items:center;gap:8px}
+.legend .chip{width:26px;height:12px;border-radius:0;display:inline-block}
+.chip.a{background:color-mix(in srgb,var(--ld-accent) 14%,transparent);border:1.5px solid var(--ld-accent)}
+.chip.b{background:var(--ld-cat-amber-soft);border:1.5px dashed var(--ld-cat-amber)}
+
+figure{margin:2.2em 0}
+figure svg{width:100%;height:auto;display:block}
+figcaption{font-size:13px;color:var(--ld-ink-faint);margin-top:10px;max-width:82ch;line-height:1.6}
+.diag-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ld-ink-faint);margin-bottom:14px}
+.diag-title::before{content:"> ";color:var(--ld-accent)}
+
+/* screenshot figure grid */
+figure.shot{margin:1.6em 0}
+figure.shot .imgframe{background:#1c2733;border:1px solid var(--ld-card-border);padding:8px;border-radius:2px}
+figure.shot img{display:block;width:100%;height:auto;border-radius:1px}
+figure.shot.single{max-width:860px}
+figure.shot figcaption{font-size:12.5px}
+.shot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:900px){.shot-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.shot-grid{grid-template-columns:1fr}}
+.shot-grid figure{margin:0}
+.shot-grid .cap{font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--ld-ink-faint);margin-top:8px;line-height:1.5}
+.shot-grid .cap b{color:var(--ld-ink-soft);font-weight:600;display:block;font-size:12px;text-transform:uppercase}
+.shot-grid figure.shot .imgframe{background:#fff;border:1px solid var(--ld-card-border);padding:6px}
+
+/* sections */
+section{padding:48px 0 6px;scroll-margin-top:56px}
+section > .diag-title{margin-top:0}
+h2{font-family:var(--display);font-weight:400;text-transform:uppercase;font-size:clamp(1.9rem,3.4vw,2.7rem);line-height:1.1;letter-spacing:.01em;margin-bottom:16px;max-width:28ch}
+h3{font-family:var(--body);font-weight:600;font-size:1.05rem;margin:1.6em 0 .6em}
+.lede{font-family:var(--body);font-weight:500;font-size:1.15rem;line-height:1.6;color:var(--ld-ink-soft);max-width:60ch;margin-bottom:1.4em}
+section p{margin:0 0 1.3em;max-width:72ch}
+section ul,section ol{margin:0 0 1.3em 1.2em;max-width:72ch}
+section li{margin:.35em 0}
+.pull{font-family:var(--body);font-weight:500;font-size:clamp(1.2rem,2.2vw,1.5rem);line-height:1.45;max-width:36ch;margin:2em 0;padding-left:22px;border-left:3px solid var(--ld-accent);color:var(--ld-ink)}
+.pull .where{display:block;font-family:var(--mono);font-weight:400;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ld-ink-faint);margin-top:12px}
+
+/* callout */
+.callout{background:var(--ld-dark);color:var(--ld-dark-ink);border-radius:0;padding:24px 28px;margin:2em 0;max-width:860px;border-left:3px solid #22d3ee}
+.callout .tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#f0a8a8;display:block;margin-bottom:12px}
+.callout h3{margin:0 0 .6em;color:#f6f8fa;font-size:1.1rem}
+.callout p{color:var(--ld-dark-ink);max-width:76ch}
+.callout code,.callout .mono{background:#26313c;border-color:#3a4550;color:#cfe6ee}
+.callout ul{color:var(--ld-dark-ink);margin:0 0 1em 1.2em;max-width:74ch}
+.callout li{margin:.3em 0}
+
+/* table */
+table{border-collapse:collapse;width:100%;max-width:980px;margin:1.4em 0;font-size:14.5px}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ld-ink-faint);text-align:left;padding:10px 14px;border-bottom:2px solid var(--ld-ink)}
+td{padding:11px 14px;border-bottom:1px solid var(--ld-rule);vertical-align:top}
+tr.reject td:last-child{color:var(--ld-cat-amber);font-weight:600}
+tr.adopt td:last-child{color:var(--ld-accent);font-weight:600}
+tr.side td:last-child{color:var(--ld-ink-faint)}
+
+table.cast th,table.cast td{vertical-align:top}
+table.cast td{font-size:14px;line-height:1.5}
+table.cast td .cap{font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--ld-ink-faint);display:block;margin-top:.4em;line-height:1.5}
+.pick{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:.22em .6em;border-radius:0;white-space:nowrap;background:color-mix(in srgb,var(--ld-accent) 12%,transparent);border:1px solid var(--ld-accent);color:var(--ld-accent)}
+.drop{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:.22em .6em;border-radius:0;white-space:nowrap;background:var(--ld-cat-amber-soft);border:1px solid var(--ld-cat-amber);color:var(--ld-cat-amber)}
+
+/* before/after two-column */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:1.6em 0;max-width:980px}
+@media(max-width:720px){.ba{grid-template-columns:1fr}}
+.ba .col{border-radius:0;padding:22px 24px}
+.ba .before{background:var(--ld-cat-amber-soft);border:1.5px dashed var(--ld-cat-amber)}
+.ba .after{background:color-mix(in srgb,var(--ld-accent) 10%,var(--ld-bg));border:1.5px solid var(--ld-accent)}
+.ba h4{font-family:var(--display);text-transform:uppercase;font-weight:400;font-size:1.5rem;margin-bottom:.5em}
+.ba .colk{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:8px}
+.ba.before .colk{color:var(--ld-cat-amber)}
+.ba.after .colk{color:var(--ld-accent)}
+.ba ul{margin-left:1.1em;font-size:15px}
+.ba li{margin:.35em 0}
+.ba strong{color:var(--ld-ink)}
+
+/* stat strip */
+.stat-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:1.8em 0;max-width:980px}
+.stat{background:var(--ld-card-bg);border:1px solid var(--ld-card-border);padding:16px 18px}
+.stat .n{font-family:var(--display);font-size:2rem;line-height:1;color:var(--ld-ink);font-weight:400}
+.stat .n.b{color:var(--ld-cat-amber)}
+.stat .n.a{color:var(--ld-accent)}
+.stat .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ld-ink-faint);display:block;margin-top:8px}
+
+/* takeaways */
+.take{margin:0 0 1.2em}
+.take .n{font-family:var(--mono);font-weight:600;color:var(--ld-accent);font-size:1em}
+.take .n.b{color:var(--ld-cat-amber)}
+/* phase strip */
+.phases{margin:1.8em 0;max-width:980px}
+.phase{display:grid;grid-template-columns:92px 1fr;gap:16px;padding:18px 0;border-bottom:1px solid var(--ld-rule)}
+.phase:last-child{border-bottom:none}
+.phase .when{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ld-ink-faint);padding-top:4px}
+.phase h3{margin:0 0 .4em}
+.phase p{margin:0 0 .6em;max-width:78ch}
+figure.gif img{display:block;width:auto;max-width:520px;height:auto}
+footer{margin-top:64px;border-top:1px solid var(--ld-rule);padding:30px 0 60px;font-size:13px;color:var(--ld-ink-faint)}
+footer p{max-width:90ch;margin-bottom:.6em}
+footer .src{font-family:var(--mono);font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="wrap">
+    <span class="kicker"><a href="#top">evan o&rsquo;keefe &rsaquo; design-agent makeover</a></span>
+    <span class="kicker">ambient-noise v1 &rarr; v2 &middot; a shipping story</span>
+  </div>
+</div>
+
+<nav class="toc" aria-label="Article sections">
+  <div class="wrap">
+    <a href="#brief">Bottom line</a>
+    <a href="#scene">The drift</a>
+    <a href="#day">The day</a>
+    <a href="#proof">Used, not just shipped</a>
+    <a href="#lesson">The lesson</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>I spent <span class="before">5 months nudging</span> a UI. Then I built <span class="after">the agent</span> that finished it in a day.</h1>
+    <p class="dek">ambient-noise is a white-noise player I actually use, most nights. For five months its look drifted one &ldquo;ui bump&rdquo; at a time. Then I stopped hand-nudging it and gave the design work a real owner: a design agent I built, fed on scraped Instagram taste, and matured until it shipped a cleaner, simpler, web-only version &mdash; in a day. This is how that happened, and the scope-explosion it taught me to stop doing.</p>
+    <div class="byline">
+      <span>First-person engineering postmortem &middot; grounded in git history + live captures</span>
+      <span>for: engineers &middot; the people I might work for or with</span>
+    </div>
+    <div class="legend">
+      <span class="key"><span class="chip b"></span>&nbsp; before &mdash; drifting &middot; hand-nudged</span>
+      <span class="key"><span class="chip a"></span>&nbsp; after &mdash; owned &middot; shipped &middot; used</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ============ 1 BOTTOM LINE ============ -->
+<section id="brief" class="reveal">
+  <h2>Bottom line</h2>
+  <p class="lede">I was not shipping design worse because I lacked taste. I was shipping it worse because the work had no owner with a method.</p>
+  <div class="take"><span class="n b">1&ensp;</span> For ~5 months ambient-noise was a <strong>working but drifting</strong> product: the log reads &ldquo;ui bump,&rdquo; &ldquo;uiux bump,&rdquo; &ldquo;v2 ui,&rdquo; &ldquo;needs more ui updates.&rdquo; Each change looked reasonable in isolation. None landed.</div>
+  <div class="take"><span class="n a">2&ensp;</span> I stopped nudging and <strong>built a design agent</strong> to own the whole thing: cast real alternatives, pick one, refine it, wire it to the engine, ship it. Off the shelf this is not. I sourced the taste, built the stack, and matured it over weeks.</div>
+  <div class="take"><span class="n a">3&ensp;</span> The agent produced five distinct design families in one day, refined a winner into <strong>UNIT-02</strong>, and pushed me toward a decision I had been avoiding: <strong>rip out the would-be iOS app</strong> and ship a lean web-only &ldquo;save to home screen&rdquo; PWA. Reuse what the platform already gives you.</div>
+  <div class="take"><span class="n a">4&ensp;</span> The result is not a mockup. <strong>I use it, most nights.</strong> Which is more than I can say for spectr, the DAW I built next and never opened. Perfect is the enemy of good, and good is the enemy of useful.</div>
+</section>
+
+<!-- ============ 2 THE DRIFT ============ -->
+<section id="scene" class="reveal">
+  <h2>The drift</h2>
+  <p class="lede">A real audio engine, wearing a generic and drifting face.</p>
+  <p>ambient-noise started in Feb 2026 as a PM-doc-first project, and it grew a genuine Web Audio engine: white/pink/brown noise, a configurable EQ, cut filters. The engine was real. The interface was a moving target, and the git log says why:</p>
+  <div class="callout reveal">
+    <span class="tag">the drift, verbatim</span>
+    <ul>
+      <li><code>2026-02-21&ensp;ui bumps</code></li>
+      <li><code>2026-02-22&ensp;uiux bump</code></li>
+      <li><code>2026-02-23&ensp;ui bump</code></li>
+      <li><code>2026-02-24&ensp;ui bump</code></li>
+      <li><code>2026-02-24&ensp;bug fix</code> &middot; <code>2026-02-26&ensp;fix: stub audio engine to unblock dev client build</code></li>
+    </ul>
+    <p>That pattern ran for five months and ~43 commits: a surface changed by small degrees and never settled, because every change was a nudge with no direction behind it.</p>
+  </div>
+  <figure class="shot-grid reveal">
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-original-desktop.webp" alt="The pre-redesign ambient-noise player, desktop, P02 playing with the EQ curve drawn"></div><div class="cap"><b>the drifting face, desktop</b>live at ambz.vercel.app &mdash; preset playing, EQ curve drawn</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-original-mobile.webp" alt="The pre-redesign player on mobile, P02 Block Snoring playing"></div><div class="cap"><b>the drifting face, mobile</b>dense tape-deck &mdash; band EQ, P/W/B noise, meter</div></figure>
+  </figure>
+  <p>This is what shipped before the redesign, captured live from ambz.vercel.app. It is a capable tape-deck product: a hardware-panel surface (SET / FLAT / DEVICE / SLP), an EQ edited band-by-band through a focused detail panel, P/W/B noise selectors, a meter, presets. Dense, functional, and busy. It reads as instrument internals, not a settled identity. Here it is with <em>P02: Block Snoring</em> playing so you can see the EQ curve.</p>
+  <div class="pull">I told an agent to &ldquo;make an awesome UI, no mistakes,&rdquo; and this is what that produced. Asking harder is not a design method.<span class="where">what I kept getting wrong</span></div>
+</section>
+
+<!-- ============ 3 THE DAY ============ -->
+<section id="day" class="reveal">
+  <h2>The day</h2>
+  <p class="lede">The fix was not more nudges. It was giving the design an owner with a method.</p>
+  <p>So I built one. Not &ldquo;the agent&rdquo; as a generic helper &mdash; a specific design-agent stack I assembled and matured: <code>ux-worker</code> owns design taste and briefs an implementer, and <code>frontend-craft</code> executes with an anti-slop craft bar. What those two know how to do, they know because I spent months scraping and curating real Instagram design content into a queryable corpus of taste, then formalised that into skills. Off the shelf, it would have produced more of the same. I was the one who made it good, and I keep making it better.</p>
+  <p>On 2026-09-05 the agent did in one day what five months of nudging could not. It did not pick a theme and build it. It <strong>cast alternatives</strong>: the same player, rendered in five genuinely distinct design languages, so the choice was real instead of vibes.</p>
+  <figure class="shot-grid reveal">
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var1.webp" alt="Variant 1 — Aurora"></div><div class="cap"><b>1 Aurora</b>soft glass / glow wellness</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2.webp" alt="Variant 2 — Terminal"></div><div class="cap"><b>2 Terminal</b>brutalist / minimal mono grid</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var3.webp" alt="Variant 3 — Fader Desk"></div><div class="cap"><b>3 Fader Desk</b>warm analog / physical material</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var4.webp" alt="Variant 4 — Score"></div><div class="cap"><b>4 Score</b>editorial typographic</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var5.webp" alt="Variant 5 — Nocturne"></div><div class="cap"><b>5 Nocturne</b>subtle 3D / sculpted surface</div></figure>
+    <figure class="shot"><div class="imgframe"><img src="screens/v1-var2-improved.webp" alt="2-improved — the winner, Terminal UNIT-02"></div><div class="cap"><b>2-improved</b>Terminal &mdash; improved &middot; the pick</div></figure>
+  </figure>
+  <p>Terminal won: brutalist, minimal, mono grid. Hard 1px rules, zero radius, square controls. The player as an instrument panel. Then the real work: the agent <strong>refined it into UNIT-02 across three rounds</strong>, adding state and meaning rather than decoration &mdash; a STANDBY/RUNNING lamp, live dB with a 0&nbsp;dB neutral rule, a proper 63&nbsp;Hz&ndash;8&nbsp;kHz octave band set, retro noise fills &mdash; and finally wired the whole surface to the real AudioEngine.</p>
+  <div class="phases">
+    <div class="phase"><div class="when">cast</div><div><h3><code>0c2ac23</code> add 5 minimal dark player UI redesign variants</h3><p>The five casts land.</p></div></div>
+    <div class="phase"><div class="when">refit</div><div><h3><code>a68fd6d</code> refit UI variants to 8-band vertical EQ, viewport-fit</h3><p>Harmonise the winner around the real control surface.</p></div></div>
+    <div class="phase"><div class="when">improve</div><div><h3><code>bfb050b</code> add improved var2 player with preset nav, dB EQ, cut filters</h3><p>Preset navigation, live dB readouts, low/high-cut filters.</p></div></div>
+    <div class="phase"><div class="when">ship</div><div><h3><code>d4ddb88</code>&hellip; var2-improved wired to the engine</h3><p>Polish, then wire the whole surface to the real audio.</p></div></div>
+  </div>
+  <figure class="shot single reveal">
+    <div class="imgframe"><img src="screens/v2-desktop.webp" alt="ambient-noise v2 — the finished UNIT-02 instrument, desktop"></div>
+    <figcaption>ambient-noise v2: the finished UNIT-02 instrument &mdash; STANDBY/RUNNING lamp, STEREO toggle, preset navigator, dB EQ, retro noise fills.</figcaption>
+  </figure>
+  <h3>The move that mattered most: make it smaller</h3>
+  <p>The v1 repo was a pnpm monorepo pointed at an Expo/iOS app. The agent did not build that iOS app out. It argued the opposite direction, and I agreed: <strong>rip the native path out entirely</strong> and ship a flat, web-only PWA. The install story became the browser&rsquo;s own &ldquo;save to home screen,&rdquo; which is real, works offline, and cost nothing to build. Fewer platforms, fewer packages, one surface. v2 is 16 commits from init to where it stands now.</p>
+  <figure class="shot single reveal">
+    <div class="imgframe"><img src="screens/v2-mobile.png" alt="ambient-noise v2 on a phone viewport"></div>
+    <figcaption>One screen at phone size, no vertical scroll &mdash; the &ldquo;save to home screen&rdquo; target. This is what I open at night.</figcaption>
+  </figure>
+  <div class="ba before after">
+    <div class="col before"><h4>Before</h4><span class="colk">the drifting tape deck</span>
+      <ul>
+        <li>A pnpm monorepo pointed at a native iOS app target.</li>
+        <li>Working audio, wandering surface: &ldquo;ui bump&rdquo; x 43 commits.</li>
+        <li>No stated identity you could hold an implementer to.</li>
+      </ul>
+    </div>
+    <div class="col after"><h4>After</h4><span class="colk">UNIT-02, web-only</span>
+      <ul>
+        <li>One explicit identity: brutalist mono instrument panel.</li>
+        <li>Five real alternatives existed, so the pick is reviewable.</li>
+        <li>Flat Next.js PWA, installed via &ldquo;save to home screen&rdquo;, offline.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 USED, NOT JUST SHIPPED ============ -->
+<section id="proof" class="reveal">
+  <h2>Used, not just shipped</h2>
+  <p class="lede">A shipped thing you never touch is a hobby. A simple thing you reach for nightly is a product.</p>
+  <p>Here is the honest measure. I do not open this app to admire UNIT-02. I open it to sleep. Most nights I pick one preset, set the low-cut so it does not fatigue my ears, and go to bed with it playing. On YouTube, &ldquo;white noise for sleep&rdquo; playlists are harsh on the high end or boomy on the low end. Tuning it for real hardware is the difference: earbuds in bed, over-ears with bass when I am working. And because v2 is a PWA that works offline, it rides in my pocket for flights and crying babies.</p>
+  <div class="stat-strip reveal">
+    <div class="stat"><span class="n a">nightly</span><span class="k">how often I actually use it</span></div>
+    <div class="stat"><span class="n b">43</span><span class="k">commits of drift (v1, ~5 months)</span></div>
+    <div class="stat"><span class="n a">16</span><span class="k">commits, flat v2, from init to now</span></div>
+    <div class="stat"><span class="n a">1 day</span><span class="k">agent redesign day (five casts + a pick)</span></div>
+  </div>
+  <div class="pull">The constraint was never engineering. It was taste with an owner. Give the design to something that will cast, pick, and commit &mdash; and it ships.</div>
+
+  <h3>The control group: spectr, the thing I never used</h3>
+  <p>Right after UNIT-02 shipped, I started &ldquo;spectr.&rdquo; It was going to be an ambient sound-design engine, then a full DAW weaving modular eurorack elements with a digital one. It felt like the impressive next thing. It was a scope explosion, and I did not use it once.</p>
+  <div class="stat-strip reveal">
+    <div class="stat"><span class="n b">128</span><span class="k">commits in ~2 weeks (May 9&ndash;24)</span></div>
+    <div class="stat"><span class="n b">~128k</span><span class="k">LOC tracked at its peak</span></div>
+    <div class="stat"><span class="n b">real</span><span class="k">piano-roll polyphony, step sequencer, DSP hardening</span></div>
+    <div class="stat"><span class="n b">0</span><span class="k">times I opened it to actually make a sound</span></div>
+  </div>
+  <figure class="shot gif reveal">
+    <img src="screens/charlie-day.gif" alt="Animated gif of Charlie Day's red-string conspiracy board">
+    <figcaption>The scope creep, visualized: a DAW &ldquo;that weaves modular eurorack with digital&rdquo; was the red-string board I built and never used. The noise generator I shipped in a day, I use every night.</figcaption>
+  </figure>
+  <p>That asymmetry is the whole lesson. UNIT-02 took discipline and taste. spectr took hubris and a git history that looks great on paper. One of them changed how I sleep. The other is a cautionary tale I keep around to check myself.</p>
+  <p class="mono" style="font-size:13px;color:var(--ld-ink-faint)">Note: audio across web, mobile, and desktop is genuinely hard. Even Andrew Kelley, creator of Zig, has said he wrote a whole language partly because existing tools could not do the audio work he wanted. Choosing not to build a native DAW was not timid. It was reading the room.</p>
+</section>
+
+<!-- ============ 5 THE LESSON ============ -->
+<section id="lesson" class="reveal">
+  <h2>The lesson</h2>
+  <p class="lede">If I started over tomorrow, these are the calls I would keep and the ones I would make sooner.</p>
+  <div class="take"><span class="n a">1&ensp;</span> <strong>Own the agent; do not rent it.</strong> Asking a generic helper to &ldquo;make an awesome UI&rdquo; is how I got v1&rsquo;s drift. The value came from an agent I sourced taste for, built, and matured &mdash; and kept improving. The judgment is mine; the agent is the tool.</div>
+  <div class="take"><span class="n a">2&ensp;</span> <strong>Cast, don&rsquo;t guess.</strong> Five honest alternatives turn &ldquo;is this good?&rdquo; into &ldquo;which of these, and why not the others?&rdquo; It is the one move that changed the outcome most.</div>
+  <div class="take"><span class="n a">3&ensp;</span> <strong>Simplification is a feature, not a failure.</strong> Ripping out the native app and shipping save-to-home-screen PWA reused what the platform already gives you. Fewer moving parts, more usage.</div>
+  <div class="take"><span class="n a">4&ensp;</span> <strong>Good beats perfect beats useful.</strong> A shipped preset I reach for nightly beats a perfect DAW I never open. If it does not get used, it does not count.</div>
+  <div class="take"><span class="n a">5&ensp;</span> <strong>If I started over:</strong> I would have run the cast-and-pick on day one instead of month five, killed the &ldquo;impressive&rdquo; DAW ambition in the first week, and let &ldquo;will I use this&rdquo; be the gate from the start instead of &ldquo;is this cool.&rdquo;</div>
+</section>
+
+</main>
+
+<footer>
+  <p class="src">Primary sources &amp; grounding &mdash; nothing here is imagined:</p>
+  <p><code>ambient-noise-app</code> git log (<code>1af4d93</code> &rarr; <code>d4ddb88</code>) and <code>apps/web/src/app/var/**/page.tsx</code>; the pre-redesign player captured live from <strong>ambz.vercel.app</strong>; <code>ambient-noise-app-v2</code> commit log &amp; README; agent definitions <code>~/.omp/agent/agents/ux-worker/</code> and <code>frontend-craft</code>; seed repos <code>scrape-ig-saved-list</code> &rarr; <code>agent-knowledgebase</code> &rarr; <code>datalake</code>. spectr figures from its git history (128 commits, ~128k tracked LOC). Zig/audio remark is from an Andrew Kelley interview and cited as recollection. Screens are live captures staged in <code>screens/</code>.</p>
+  <p class="src">evan o&rsquo;keefe &middot; design-agent makeover &middot; 2026-09</p>
+</footer>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  var els=document.querySelectorAll('.reveal');
+  if(!('IntersectionObserver' in window)||window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    root.classList.add('js');
+    for(var i=0;i<els.length;i++){els[i].classList.add('in')}
+    return;
+  }
+  root.classList.add('js');
+  var io=new IntersectionObserver(function(en){
+    for(var i=0;i<en.length;i++){if(en[i].isIntersecting){en[i].target.classList.add('in');io.unobserve(en[i].target)}}
+  },{threshold:.08});
+  for(var j=0;j<els.length;j++){io.observe(els[j])}
+  var links=document.querySelectorAll('nav.toc a');
+  var secs=Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var tocIO=new IntersectionObserver(function(en){
+    for(var i=0;i<en.length;i++){if(en[i].isIntersecting){
+      var id=en[i].target.id;
+      for(var k=0;k<links.length;k++){links[k].classList.toggle('active',links[k].getAttribute('href')==='#'+id)}
+    }}
+  },{rootMargin:'-40% 0px -55% 0px'});
+  for(var m=0;m<secs.length;m++){tocIO.observe(secs[m])}
+})();
+</script>
+</body>
+</html>

@@ -36,6 +36,12 @@ pnpm build
 pnpm start
 ```
 
+## Deploy
+
+Push to GitHub, import into Vercel (framework preset: Next.js). No environment
+variables, no build settings needed. `pnpm build` is the default build command
+(it stamps a versioned service worker from `public/sw.template.js`).
+
 ## Installable PWA
 
 `public/manifest.json` + a versioned service worker make the app installable on
