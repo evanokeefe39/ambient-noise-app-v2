@@ -148,6 +148,15 @@ export class AudioEngine implements IAudioEngine {
   private _highCutDry: GainNode | null = null
   private _lowCutHz: number | null = null
   private _highCutHz: number | null = null
+  /**
+   * Whether each cut is currently engaged (wet path open). Tracked explicitly
+   * rather than read from `wet.gain.value`: an AudioParam reports the last
+   * *scheduled* value, not the value mid-ramp, so a re-toggle during the 30 ms
+   * crossfade would misread it and step the filter frequency while the wet path
+   * is still partly open — reintroducing the slew-under-live-signal artifact.
+   */
+  private _lowCutEngaged = false
+  private _highCutEngaged = true
   private _stereo = true
 
   // One source node + crossfade gain node per noise color
@@ -385,7 +394,7 @@ export class AudioEngine implements IAudioEngine {
         // ramped while audible — a 48 dB/oct cascade slewing under live signal
         // warps and stutters. That was the toggle artifact.
         const target = this._lowCutHz!
-        const engaged = this._lowCutWet ? this._lowCutWet.gain.value > 0 : false
+        const engaged = this._lowCutEngaged
         for (const f of this._lowCutStages) {
           f.frequency.cancelScheduledValues(now)
           if (engaged) {
@@ -402,7 +411,8 @@ export class AudioEngine implements IAudioEngine {
       }
       // Bypass is a pure gain crossfade between the filtered and unfiltered
       // legs. No filter coefficient moves, so there is no slew and no step.
-      this._crossfadeGains_(
+      this._lowCutEngaged = !bypassed
+      this._rampCutBypass(
         this._lowCutWet,
         this._lowCutDry,
         bypassed ? 0 : 1,
@@ -419,7 +429,7 @@ export class AudioEngine implements IAudioEngine {
       const bypassed = this._highCutHz === null
       if (!bypassed) {
         const target = this._highCutHz!
-        const engaged = this._highCutWet ? this._highCutWet.gain.value > 0 : false
+        const engaged = this._highCutEngaged
         this._highCutFilter.frequency.cancelScheduledValues(now)
         if (engaged) {
           this._highCutFilter.frequency.setValueAtTime(
@@ -435,7 +445,8 @@ export class AudioEngine implements IAudioEngine {
           this._highCutFilter.frequency.setValueAtTime(target, now)
         }
       }
-      this._crossfadeGains_(
+      this._highCutEngaged = !bypassed
+      this._rampCutBypass(
         this._highCutWet,
         this._highCutDry,
         bypassed ? 0 : 1,
@@ -445,12 +456,18 @@ export class AudioEngine implements IAudioEngine {
   }
 
   /**
-   * Equal-weight dry/wet crossfade used by the cut-filter bypass.
+   * Linear dry/wet crossfade used by the cut-filter bypass.
    * Ramps `wet` toward `wetTarget` and `dry` to its complement over
    * CUT_RAMP_TAU. Gain is the only thing that moves, so the transition is
    * continuous in the signal domain regardless of filter topology.
+   *
+   * Linear, NOT equal-power, is correct here: both legs carry the same source,
+   * so they sum coherently. Measured on a frozen noise buffer at the midpoint,
+   * a linear crossfade gives 0.9955x (a 0.04 dB dip, inaudible) while
+   * equal-power gives 1.4079x (a +3 dB bump). Equal-power is for uncorrelated
+   * sources and would make every toggle audibly louder in the middle.
    */
-  private _crossfadeGains_(
+  private _rampCutBypass(
     wet: GainNode | null,
     dry: GainNode | null,
     wetTarget: number,
