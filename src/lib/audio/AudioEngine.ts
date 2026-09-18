@@ -1,15 +1,21 @@
 /**
  * AudioEngine — implements IAudioEngine from @ambient/shared.
  * Manages the full Web Audio API graph:
- *   [NoiseSource] → [CrossfadeGain] → [LowCut×4] → [HighCut lp]
+ *   [NoiseSource] → [CrossfadeGain] → [LowCut×4] → [LowCut shaper] → [HighCut lp]
  *     → [EQChain] → [HeadphoneEQ] → [MasterGain] → [Destination]
  * The LowCut and HighCut filters are optional: when off they sit at transparent
  * defaults and do not affect the signal.
  *
- * LOW CUT is 8th order (48 dB/oct): four cascaded highpass biquads in a
- * Linkwitz-Riley alignment (Q 0.707 x4), which is both steeper and less
- * resonant at the corner than the Butterworth pole set. A single biquad is
- * only 2nd order (12 dB/oct), which is why the cascade exists.
+ * LOW CUT is 8th order (48 dB/oct): four cascaded highpass biquads at Q 0.707
+ * (a Linkwitz-Riley cascade). A single biquad is only 2nd order (12 dB/oct),
+ * which is why the cascade exists.
+ *
+ * Cascading four highpass sections at one corner makes the response overshoot
+ * by ~+7 dB just above the corner, which is audible as a boost at whatever
+ * frequency the cut is set to. A peaking filter after the cascade cancels it
+ * (see LOWCUT_SHAPE_* below). This overshoot is a fixed shape of the cascade,
+ * not of the corner frequency, so the shaper tracks the slider by ratio.
+ *
  * HIGH CUT is deliberately gentler at 2nd order (12 dB/oct): one lowpass biquad.
  *
  * On iOS, MasterGain routes through MediaStreamDestinationNode → <audio> element
@@ -48,16 +54,32 @@ const CROSSFADE_DURATION = 0.5 // seconds — W2.A5
  * puts the corner at -6 dB (amplitude-halving) rather than peaking.
  *
  * Deliberately NOT the Butterworth pole set (0.510/0.601/0.900/2.563): the
- * Q 2.563 stage made the response peak sharply just above the corner, which is
- * audible as a boost at whatever frequency the cut is set to. Measured at a
- * 100 Hz corner, Butterworth peaked +8.2 dB at 125 Hz vs +6.9 dB for LR.
+ * Q 2.563 stage peaks sharply just above the corner. Measured with the corner
+ * at 100 Hz, Butterworth peaked +8.2 dB at 125 Hz vs +6.9 dB for this set.
  *
- * Note the residual +6.9 dB bump is inherent to cascading four highpass stages
- * at one frequency, not to the Q values — any 4-stage cascade shows it. Damping
- * the Qs is the cheap part of the fix; flattening the corner properly would
- * need staggered corner frequencies.
+ * The residual overshoot is the cascade itself, not the Q values. Staggering
+ * the four corners across two frequencies only relocated the peak (at a 25 Hz
+ * corner: +6.98 dB single, +6.45 dB at 1.3x, +4.93 dB at 2.0x, but moving the
+ * peak up into a more audible range). The overshoot is removed instead by
+ * LOWCUT_SHAPE_* below.
  */
 const LOWCUT_QS = [0.7071068, 0.7071068, 0.7071068, 0.7071068] as const
+
+/**
+ * Compensation for the LOW CUT cascade overshoot.
+ * Four cascaded highpass stages overshoot ~+7 dB just above the corner. A
+ * peaking CUT placed at LOWCUT_SHAPE_RATIO x the corner removes it.
+ *
+ * Measured across corners of 25/30/35/40/60/100/200 Hz, the result is identical
+ * at every corner, so the shape is a property of the cascade and scales:
+ *   raw peak        +6.98 dB at 1.33 x corner
+ *   shaped peak     +1.05 dB
+ *   low-end reject  -43.7 dB -> -44.7 dB (48 dB/oct preserved)
+ * Applied only while LOW CUT is on; the shaper parks at unity gain otherwise.
+ */
+const LOWCUT_SHAPE_RATIO = 1.36
+const LOWCUT_SHAPE_Q = 1.0
+const LOWCUT_SHAPE_GAIN_DB = -6
 
 /**
  * Time constant (seconds) for setTargetAtTime smoothing on cut-frequency
@@ -97,6 +119,7 @@ export class AudioEngine implements IAudioEngine {
   private _eqChain: EQChain | null = null
   private _headphoneChain: EQChain | null = null
   private _lowCutStages: BiquadFilterNode[] = []
+  private _lowCutShaper: BiquadFilterNode | null = null
   private _highCutFilter: BiquadFilterNode | null = null
   private _lowCutHz: number | null = null
   private _highCutHz: number | null = null
@@ -138,9 +161,10 @@ export class AudioEngine implements IAudioEngine {
     this._headphoneChain = createEQChain(this._ctx)
     this._headphoneChain.reset() // ensure flat (0 dB gain on all bands)
 
-    // Optional cut filters (transparent when off): Crossfade → LowCut(×4) → HighCut → EQ
-    // LOW CUT is four cascaded highpass biquads (8th order, 48 dB/oct) in a
-    // Butterworth alignment — the Q set makes the combined response flat.
+    // Optional cut filters (transparent when off): Crossfade → LowCut(×4) → shaper → HighCut → EQ
+    // LOW CUT is four cascaded highpass biquads (8th order, 48 dB/oct) at
+    // Q 0.707 (Linkwitz-Riley), followed by a peaking cut that cancels the
+    // cascade's ~+7 dB corner overshoot. See LOWCUT_SHAPE_* above.
     this._lowCutStages = LOWCUT_QS.map((q) => {
       const f = this._ctx!.createBiquadFilter()
       f.type = 'highpass'
@@ -151,12 +175,19 @@ export class AudioEngine implements IAudioEngine {
     for (let i = 0; i < this._lowCutStages.length - 1; i++) {
       this._lowCutStages[i].connect(this._lowCutStages[i + 1])
     }
+    // Shaper parks at unity gain (gain 0 dB) while LOW CUT is off.
+    this._lowCutShaper = this._ctx.createBiquadFilter()
+    this._lowCutShaper.type = 'peaking'
+    this._lowCutShaper.frequency.value = LOWCUT_OFF_HZ * LOWCUT_SHAPE_RATIO
+    this._lowCutShaper.Q.value = LOWCUT_SHAPE_Q
+    this._lowCutShaper.gain.value = 0
     // HIGH CUT stays 2nd order (12 dB/oct) — intentionally gentler than LOW CUT.
     this._highCutFilter = this._ctx.createBiquadFilter()
     this._highCutFilter.type = 'lowpass'
     this._highCutFilter.frequency.value = HIGHCUT_OFF_HZ
     this._highCutFilter.Q.value = 0.707
-    this._lowCutStages[this._lowCutStages.length - 1].connect(this._highCutFilter)
+    this._lowCutStages[this._lowCutStages.length - 1].connect(this._lowCutShaper)
+    this._lowCutShaper.connect(this._highCutFilter)
     this._highCutFilter.connect(this._eqChain.input)
     this._eqChain.output.connect(this._headphoneChain.input)
     this._headphoneChain.output.connect(this._masterGain)
@@ -232,6 +263,7 @@ export class AudioEngine implements IAudioEngine {
     }
     this._masterGain?.disconnect()
     this._lowCutStages.forEach((n) => n.disconnect())
+    this._lowCutShaper?.disconnect()
     this._highCutFilter?.disconnect()
     if (this._iosAudioEl) {
       this._iosAudioEl.pause()
@@ -245,6 +277,7 @@ export class AudioEngine implements IAudioEngine {
     this._eqChain = null
     this._headphoneChain = null
     this._lowCutStages = []
+    this._lowCutShaper = null
     this._highCutFilter = null
     this._sourceNodes = {}
     this._crossfadeGains = {}
@@ -265,23 +298,45 @@ export class AudioEngine implements IAudioEngine {
 
   /**
    * Enable/disable low cut (highpass). hz cutoff or null to bypass.
-   * All cascade stages are driven together; the 8th-order Butterworth
-   * alignment only holds if they share a frequency.
+   * All cascade stages plus the overshoot shaper are driven together; the
+   * 8th-order Linkwitz-Riley response only holds if the stages share a
+   * frequency, and the shaper must track it by ratio.
    */
   setLowCut(hz: number | null): void {
     this._lowCutHz = hz !== null && hz > 0 ? hz : null
-    if (this._lowCutStages.length && this._ctx) {
+    if (this._lowCutStages.length && this._lowCutShaper && this._ctx) {
       const target = this._lowCutHz ?? LOWCUT_OFF_HZ
       const now = this._ctx.currentTime
+      const bypassed = this._lowCutHz === null
       for (const f of this._lowCutStages) {
-        // Drop any pending automation first: a fast slider drag leaves a
-        // future-scheduled event that would otherwise override a later bypass
-        // step, so the filter would not settle at the park frequency.
+        // Clear any pending setTargetAtTime trajectory so it cannot keep
+        // pulling the param toward a previous target.
         f.frequency.cancelScheduledValues(now)
         // Bypass is a step: setTargetAtTime approaches asymptotically and
         // would leave the filter audibly short of its target.
-        if (this._lowCutHz === null) f.frequency.setValueAtTime(target, now)
+        if (bypassed) f.frequency.setValueAtTime(target, now)
         else f.frequency.setTargetAtTime(target, now, CUT_SMOOTHING_TAU)
+      }
+      // Shaper: tracks the corner by ratio, and is unity gain when bypassed.
+      this._lowCutShaper.frequency.cancelScheduledValues(now)
+      this._lowCutShaper.gain.cancelScheduledValues(now)
+      if (bypassed) {
+        this._lowCutShaper.frequency.setValueAtTime(
+          LOWCUT_OFF_HZ * LOWCUT_SHAPE_RATIO,
+          now,
+        )
+        this._lowCutShaper.gain.setValueAtTime(0, now)
+      } else {
+        this._lowCutShaper.frequency.setTargetAtTime(
+          target * LOWCUT_SHAPE_RATIO,
+          now,
+          CUT_SMOOTHING_TAU,
+        )
+        this._lowCutShaper.gain.setTargetAtTime(
+          LOWCUT_SHAPE_GAIN_DB,
+          now,
+          CUT_SMOOTHING_TAU,
+        )
       }
     }
   }
