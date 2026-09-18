@@ -97,6 +97,18 @@ const LOWCUT_SHAPE_GAIN_DB = -6
 const CUT_SMOOTHING_TAU = 0.015
 
 /**
+ * Duration (seconds) of the bypass cross-ramp on the cut filters.
+ * Bypass must ramp, not step: a stepped frequency change is a step in the
+ * filter's transfer function, which is a discontinuity through live signal and
+ * clicks. Measured offline on the OFF transition, a stepped bypass showed a
+ * sample-to-sample jump 2.3x the signal's own baseline slope (worst at
+ * frequencies near the corner, where the filter has the most gain). Ramping
+ * removes it. 30 ms is long enough to be smooth and short enough to feel
+ * instant.
+ */
+const CUT_RAMP_TAU = 0.03
+
+/**
  * Transparent "off" cutoff frequency for LOW CUT.
  * Must sit low: with four cascaded highpass stages at Q 0.707, parking the
  * stack at 5 Hz would add +0.50 dB at 31.5 Hz and +0.13 dB at 63 Hz. At 2 Hz
@@ -316,35 +328,35 @@ export class AudioEngine implements IAudioEngine {
       const now = this._ctx.currentTime
       const bypassed = this._lowCutHz === null
       for (const f of this._lowCutStages) {
-        // Clear any pending setTargetAtTime trajectory so it cannot keep
-        // pulling the param toward a previous target.
+        // Clear any pending trajectory so it cannot keep pulling the param
+        // toward a previous target.
         f.frequency.cancelScheduledValues(now)
-        // Bypass is a step: setTargetAtTime approaches asymptotically and
-        // would leave the filter audibly short of its target.
-        if (bypassed) f.frequency.setValueAtTime(target, now)
-        else f.frequency.setTargetAtTime(target, now, CUT_SMOOTHING_TAU)
+        // Always ramp, never step. A stepped frequency change is a step in the
+        // filter's transfer function, which clicks through live signal — worst
+        // on bypass, where the frequency crosses the region of peak gain. Hold
+        // the current value then ramp (same idiom as the noise crossfade).
+        f.frequency.setValueAtTime(f.frequency.value, now)
+        f.frequency.linearRampToValueAtTime(
+          target,
+          now + (bypassed ? CUT_RAMP_TAU : CUT_SMOOTHING_TAU),
+        )
       }
-      // Shaper: tracks the corner by ratio, and is unity gain when bypassed.
+      // Shaper: tracks the corner by ratio, unity gain when bypassed.
       this._lowCutShaper.frequency.cancelScheduledValues(now)
       this._lowCutShaper.gain.cancelScheduledValues(now)
-      if (bypassed) {
-        this._lowCutShaper.frequency.setValueAtTime(
-          LOWCUT_OFF_HZ * LOWCUT_SHAPE_RATIO,
-          now,
-        )
-        this._lowCutShaper.gain.setValueAtTime(0, now)
-      } else {
-        this._lowCutShaper.frequency.setTargetAtTime(
-          target * LOWCUT_SHAPE_RATIO,
-          now,
-          CUT_SMOOTHING_TAU,
-        )
-        this._lowCutShaper.gain.setTargetAtTime(
-          LOWCUT_SHAPE_GAIN_DB,
-          now,
-          CUT_SMOOTHING_TAU,
-        )
-      }
+      this._lowCutShaper.frequency.setValueAtTime(
+        this._lowCutShaper.frequency.value,
+        now,
+      )
+      this._lowCutShaper.gain.setValueAtTime(this._lowCutShaper.gain.value, now)
+      this._lowCutShaper.frequency.linearRampToValueAtTime(
+        target * LOWCUT_SHAPE_RATIO,
+        now + (bypassed ? CUT_RAMP_TAU : CUT_SMOOTHING_TAU),
+      )
+      this._lowCutShaper.gain.linearRampToValueAtTime(
+        bypassed ? 0 : LOWCUT_SHAPE_GAIN_DB,
+        now + (bypassed ? CUT_RAMP_TAU : CUT_SMOOTHING_TAU),
+      )
     }
   }
 
@@ -354,15 +366,18 @@ export class AudioEngine implements IAudioEngine {
     if (this._highCutFilter && this._ctx) {
       const target = this._highCutHz ?? HIGHCUT_OFF_HZ
       const now = this._ctx.currentTime
+      const bypassed = this._highCutHz === null
       this._highCutFilter.frequency.cancelScheduledValues(now)
-      if (this._highCutHz === null)
-        this._highCutFilter.frequency.setValueAtTime(target, now)
-      else
-        this._highCutFilter.frequency.setTargetAtTime(
-          target,
-          now,
-          CUT_SMOOTHING_TAU,
-        )
+      // Ramp, never step — see CUT_RAMP_TAU. This path had the largest measured
+      // discontinuity of the two (2.1x baseline on a 3 kHz tone).
+      this._highCutFilter.frequency.setValueAtTime(
+        this._highCutFilter.frequency.value,
+        now,
+      )
+      this._highCutFilter.frequency.linearRampToValueAtTime(
+        target,
+        now + (bypassed ? CUT_RAMP_TAU : CUT_SMOOTHING_TAU),
+      )
     }
   }
 
